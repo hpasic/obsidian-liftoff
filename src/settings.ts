@@ -13,8 +13,6 @@ export class LiftOffSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "LiftOff Settings" });
-
 		new Setting(containerEl)
 			.setName("Workout folder")
 			.setDesc("Folder where workout notes are saved")
@@ -33,7 +31,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 			.setDesc("Folder where workout templates are stored")
 			.addText((text) =>
 				text
-					.setPlaceholder("Workout Templates")
+					.setPlaceholder("Workout templates")
 					.setValue(this.plugin.settings.templateFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.templateFolder = value;
@@ -90,7 +88,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h3", { text: "Timer Exercises" });
+		new Setting(containerEl).setName("Timer exercises").setHeading();
 
 		new Setting(containerEl)
 			.setName("Default work duration")

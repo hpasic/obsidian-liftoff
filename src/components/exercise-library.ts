@@ -23,7 +23,7 @@ export class ExerciseLibraryModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("ln-exercise-library");
 
-		contentEl.createEl("h3", { text: "Exercise Library" });
+		contentEl.createEl("h3", { text: "Exercise library" });
 
 		this.listEl = contentEl.createDiv({ cls: "ln-el-list" });
 		this.renderList();
@@ -83,17 +83,19 @@ export class ExerciseLibraryModal extends Modal {
 			cls: "ln-el-action-btn ln-el-delete-btn",
 			text: "\u00D7",
 		});
-		deleteBtn.addEventListener("click", async () => {
-			const confirmed = await new ConfirmModal(
-				this.app,
-				`Delete "${entry.name}"?`
-			).openAndWait();
-			if (confirmed) {
-				this.library.splice(index, 1);
-				this.editingIndex = null;
-				this.save();
-				this.renderList();
-			}
+		deleteBtn.addEventListener("click", () => {
+			void (async () => {
+				const confirmed = await new ConfirmModal(
+					this.app,
+					`Delete "${entry.name}"?`
+				).openAndWait();
+				if (confirmed) {
+					this.library.splice(index, 1);
+					this.editingIndex = null;
+					this.save();
+					this.renderList();
+				}
+			})();
 		});
 	}
 
@@ -101,7 +103,7 @@ export class ExerciseLibraryModal extends Modal {
 		const row = this.listEl.createDiv({ cls: "ln-el-row ln-el-row-editing" });
 
 		// Name input
-		const nameLabel = row.createDiv({ cls: "ln-el-edit-label", text: "Name" });
+		row.createDiv({ cls: "ln-el-edit-label", text: "Name" });
 		const nameInput = row.createEl("input", {
 			cls: "ln-el-edit-input",
 			attr: { type: "text", value: entry.name },
@@ -137,7 +139,7 @@ export class ExerciseLibraryModal extends Modal {
 		row.createDiv({ cls: "ln-el-edit-label", text: "Notes" });
 		const notesInput = row.createEl("textarea", {
 			cls: "ln-el-edit-textarea",
-			attr: { placeholder: "e.g. use narrow grip, keep core tight", rows: "2" },
+			attr: { placeholder: "E.g. Use narrow grip, keep core tight", rows: "2" },
 		});
 		notesInput.value = entry.notes ?? "";
 

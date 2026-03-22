@@ -1,7 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type LiftOffPlugin from "../main";
 import type { WorkoutTemplate } from "../types";
-import type { RecentWorkout } from "../storage/workout-store";
 import { TextInputModal, ConfirmModal } from "../components/modals";
 import { TemplateEditorModal } from "../components/template-editor";
 import { ExerciseLibraryModal } from "../components/exercise-library";
@@ -21,7 +20,7 @@ export class HomeView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "LiftOff";
+		return "Liftoff";
 	}
 
 	getIcon(): string {
@@ -39,10 +38,10 @@ export class HomeView extends ItemView {
 
 		const startBtn = container.createEl("button", {
 			cls: "ln-start-workout-btn",
-			text: "+ Start Empty Workout",
+			text: "+ start empty workout",
 		});
 		startBtn.addEventListener("click", () => {
-			this.plugin.startWorkout(null);
+			void this.plugin.startWorkout(null);
 		});
 
 		const templatesSection = container.createDiv({ cls: "ln-section" });
@@ -54,10 +53,10 @@ export class HomeView extends ItemView {
 
 		const newTemplateBtn = templatesHeader.createEl("button", {
 			cls: "ln-new-template-btn",
-			text: "+ New",
+			text: "+ new",
 		});
 		newTemplateBtn.addEventListener("click", () => {
-			this.createNewTemplate();
+			void this.createNewTemplate();
 		});
 
 		const templatesList = templatesSection.createDiv({ cls: "ln-templates-list" });
@@ -87,7 +86,7 @@ export class HomeView extends ItemView {
 		});
 
 		const recentList = recentSection.createDiv({ cls: "ln-recent-list" });
-		await this.renderRecentWorkouts(recentList);
+		this.renderRecentWorkouts(recentList);
 	}
 
 	private async renderTemplates(containerEl: HTMLElement): Promise<void> {
@@ -130,27 +129,29 @@ export class HomeView extends ItemView {
 				cls: "ln-template-delete-btn",
 				text: "\u00D7",
 			});
-			deleteBtn.addEventListener("click", async (e) => {
+			deleteBtn.addEventListener("click", (e) => {
 				e.stopPropagation();
-				const confirmed = await new ConfirmModal(this.app, `Delete template "${template.name}"?`).openAndWait();
-				if (confirmed) {
-					await this.plugin.templateStore.deleteTemplate(template.name);
-					this.renderHome();
-				}
+				void (async () => {
+					const confirmed = await new ConfirmModal(this.app, `Delete template "${template.name}"?`).openAndWait();
+					if (confirmed) {
+						await this.plugin.templateStore.deleteTemplate(template.name);
+						await this.renderHome();
+					}
+				})();
 			});
 
 			item.addEventListener("click", () => {
 				if (template.exercises.length === 0) {
 					this.openTemplateEditor(template);
 				} else {
-					this.plugin.startWorkout(template);
+					void this.plugin.startWorkout(template);
 				}
 			});
 		}
 	}
 
-	private async renderRecentWorkouts(containerEl: HTMLElement): Promise<void> {
-		const recent = await this.plugin.workoutStore.getRecentWorkouts(10);
+	private renderRecentWorkouts(containerEl: HTMLElement): void {
+		const recent = this.plugin.workoutStore.getRecentWorkouts(10);
 
 		if (recent.length === 0) {
 			containerEl.createDiv({
@@ -198,16 +199,17 @@ export class HomeView extends ItemView {
 	}
 
 	private openTemplateEditor(template: WorkoutTemplate): void {
-		const recentWorkouts = this.plugin.workoutStore;
 		new TemplateEditorModal(
 			this.app,
 			template,
 			this.plugin.settings.exerciseLibrary,
 			[],
-			async (updated) => {
-				await this.plugin.templateStore.saveTemplate(updated);
-				new Notice(`Template "${updated.name}" saved.`);
-				await this.renderHome();
+			(updated) => {
+				void (async () => {
+					await this.plugin.templateStore.saveTemplate(updated);
+					new Notice(`Template "${updated.name}" saved.`);
+					await this.renderHome();
+				})();
 			}
 		).open();
 	}
@@ -216,10 +218,12 @@ export class HomeView extends ItemView {
 		new ExerciseLibraryModal(
 			this.app,
 			this.plugin.settings.exerciseLibrary,
-			async (updatedLibrary) => {
-				this.plugin.settings.exerciseLibrary = updatedLibrary;
-				await this.plugin.saveSettings();
-				this.renderHome();
+			(updatedLibrary) => {
+				void (async () => {
+					this.plugin.settings.exerciseLibrary = updatedLibrary;
+					await this.plugin.saveSettings();
+					await this.renderHome();
+				})();
 			}
 		).open();
 	}

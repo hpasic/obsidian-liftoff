@@ -1,5 +1,5 @@
 import { App, Modal } from "obsidian";
-import type { WorkoutTemplate, TemplateExercise, ExerciseLibraryEntry } from "../types";
+import type { WorkoutTemplate, ExerciseLibraryEntry } from "../types";
 import { ExercisePickerModal } from "./exercise-picker";
 
 export class TemplateEditorModal extends Modal {
@@ -38,7 +38,7 @@ export class TemplateEditorModal extends Modal {
 
 		const addBtn = contentEl.createEl("button", {
 			cls: "ln-te-add-btn",
-			text: "+ Add Exercise",
+			text: "+ add exercise",
 		});
 		addBtn.addEventListener("click", () => {
 			new ExercisePickerModal(
@@ -58,7 +58,7 @@ export class TemplateEditorModal extends Modal {
 
 		const saveBtn = contentEl.createEl("button", {
 			cls: "ln-te-save-btn",
-			text: "Save Template",
+			text: "Save template",
 		});
 		saveBtn.addEventListener("click", () => {
 			this.onSave(this.template);

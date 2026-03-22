@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type LiftOffPlugin from "../main";
-import type { Workout, Exercise, WorkoutSet, ExerciseType } from "../types";
+import type { Workout, Exercise, ExerciseType } from "../types";
 import type { WorkoutTemplate } from "../types";
 import { ExerciseCard } from "../components/exercise-card";
 import { ExercisePickerModal } from "../components/exercise-picker";
@@ -34,7 +34,7 @@ export class WorkoutView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "LiftOff - Workout";
+		return "Liftoff - workout";
 	}
 
 	getIcon(): string {
@@ -89,7 +89,7 @@ export class WorkoutView extends ItemView {
 			};
 		});
 		this.startTime = new Date();
-		await this.loadRecentWorkouts();
+		this.loadRecentWorkouts();
 		this.autoFillFromHistory();
 		this.renderWorkout();
 	}
@@ -98,15 +98,15 @@ export class WorkoutView extends ItemView {
 		this.initialized = true;
 		this.workout = this.createEmptyWorkout();
 		this.startTime = new Date();
-		await this.loadRecentWorkouts();
+		this.loadRecentWorkouts();
 		this.renderWorkout();
 	}
 
-	private async loadRecentWorkouts(): Promise<void> {
-		const recentMeta = await this.plugin.workoutStore.getRecentWorkouts(20);
+	private loadRecentWorkouts(): void {
+		const recentMeta = this.plugin.workoutStore.getRecentWorkouts(20);
 		const workouts: Workout[] = [];
 		for (const meta of recentMeta) {
-			const w = await this.plugin.workoutStore.parseWorkoutFile(meta.path);
+			const w = this.plugin.workoutStore.parseWorkoutFile(meta.path);
 			if (w) workouts.push(w);
 		}
 		this.recentWorkouts = workouts;
@@ -134,14 +134,15 @@ export class WorkoutView extends ItemView {
 		}
 	}
 
-	async onOpen(): Promise<void> {
+	onOpen(): Promise<void> {
 		// If not freshly started via startEmpty/startFromTemplate,
 		// this is a workspace restoration — redirect to home.
 		window.setTimeout(() => {
 			if (!this.initialized) {
-				this.plugin.showHomeView();
+				void this.plugin.showHomeView();
 			}
 		}, 100);
+		return Promise.resolve();
 	}
 
 	private renderWorkout(): void {
@@ -205,7 +206,7 @@ export class WorkoutView extends ItemView {
 
 		const addExBtn = actionsEl.createEl("button", {
 			cls: "ln-add-exercise-btn",
-			text: "+ Add Exercise",
+			text: "+ add exercise",
 		});
 		addExBtn.addEventListener("click", () => {
 			this.openExercisePicker();
@@ -213,10 +214,10 @@ export class WorkoutView extends ItemView {
 
 		const finishBtn = actionsEl.createEl("button", {
 			cls: "ln-finish-btn",
-			text: "Finish Workout",
+			text: "Finish workout",
 		});
 		finishBtn.addEventListener("click", () => {
-			this.finishWorkout();
+			void this.finishWorkout();
 		});
 	}
 
@@ -293,10 +294,10 @@ export class WorkoutView extends ItemView {
 		const existing = this.plugin.settings.exerciseLibrary.find((e) => e.name === name);
 		if (!existing) {
 			this.plugin.settings.exerciseLibrary.push({ name, exerciseType });
-			this.plugin.saveSettings();
+			void this.plugin.saveSettings();
 		} else if (!existing.exerciseType && exerciseType === "timer") {
 			existing.exerciseType = exerciseType;
-			this.plugin.saveSettings();
+			void this.plugin.saveSettings();
 		}
 
 		const isTimer = exerciseType === "timer";
@@ -363,16 +364,17 @@ export class WorkoutView extends ItemView {
 		try {
 			await this.plugin.workoutStore.saveWorkout(this.workout);
 			new Notice("Workout saved!");
-			this.plugin.showHomeView();
+			void this.plugin.showHomeView();
 		} catch (e) {
-			new Notice(`Error saving workout: ${e}`);
+			new Notice(`Error saving workout: ${String(e)}`);
 		}
 	}
 
-	async onClose(): Promise<void> {
+	onClose(): Promise<void> {
 		if (this.timerIntervalId !== null) {
 			window.clearInterval(this.timerIntervalId);
 		}
 		this.stopRestTimer();
+		return Promise.resolve();
 	}
 }

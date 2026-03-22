@@ -27,7 +27,7 @@ export class ExercisePickerModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("ln-exercise-picker");
 
-		contentEl.createEl("h3", { text: "Add Exercise" });
+		contentEl.createEl("h3", { text: "Add exercise" });
 
 		this.searchInput = contentEl.createEl("input", {
 			cls: "ln-exercise-search",

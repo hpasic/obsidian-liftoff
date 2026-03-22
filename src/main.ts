@@ -22,15 +22,15 @@ export default class LiftOffPlugin extends Plugin {
 
 		this.addSettingTab(new LiftOffSettingTab(this.app, this));
 
-		this.addRibbonIcon("dumbbell", "Open LiftOff", () => {
-			this.showHomeView();
+		this.addRibbonIcon("dumbbell", "Open liftoff", () => {
+			void this.showHomeView();
 		});
 
 		this.addCommand({
-			id: "open-liftoff",
-			name: "Open LiftOff",
+			id: "open-home",
+			name: "Open home",
 			callback: () => {
-				this.showHomeView();
+				void this.showHomeView();
 			},
 		});
 
@@ -38,7 +38,7 @@ export default class LiftOffPlugin extends Plugin {
 			id: "start-empty-workout",
 			name: "Start empty workout",
 			callback: () => {
-				this.startWorkout(null);
+				void this.startWorkout(null);
 			},
 		});
 	}
@@ -68,7 +68,7 @@ export default class LiftOffPlugin extends Plugin {
 			type: HOME_VIEW_TYPE,
 			active: true,
 		});
-		this.app.workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 	}
 
 	async startWorkout(template: WorkoutTemplate | null): Promise<void> {
@@ -86,7 +86,7 @@ export default class LiftOffPlugin extends Plugin {
 			type: WORKOUT_VIEW_TYPE,
 			active: true,
 		});
-		this.app.workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 
 		const view = leaf.view;
 		if (view instanceof WorkoutView) {
@@ -99,7 +99,7 @@ export default class LiftOffPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<LiftOffSettings>) };
 	}
 
 	async saveSettings() {

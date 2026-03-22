@@ -27,7 +27,7 @@ export class TemplateStore {
 
 			const exercises: TemplateExercise[] = [];
 			if (Array.isArray(fm.exercises)) {
-				for (const ex of fm.exercises) {
+				for (const ex of fm.exercises as Array<Record<string, unknown>>) {
 					exercises.push({
 						name: String(ex.name),
 						targetSets: Number(ex.targetSets) || 3,
@@ -38,7 +38,7 @@ export class TemplateStore {
 
 			templates.push({
 				type: "workout-template",
-				name: fm.name ?? file.basename,
+				name: typeof fm.name === "string" ? fm.name : file.basename,
 				exercises,
 			});
 		}
@@ -83,15 +83,15 @@ export class TemplateStore {
 		const filePath = normalizePath(`${settings.templateFolder}/${name}.md`);
 		const file = this.app.vault.getAbstractFileByPath(filePath);
 		if (file instanceof TFile) {
-			await this.app.vault.delete(file);
+			await this.app.fileManager.trashFile(file);
 		}
 	}
 
-	private parseFrontmatter(content: string): Record<string, any> | null {
+	private parseFrontmatter(content: string): Record<string, unknown> | null {
 		const match = content.match(/^---\n([\s\S]*?)\n---/);
 		if (!match || !match[1]) return null;
 		try {
-			return parseYaml(match[1]);
+			return parseYaml(match[1]) as Record<string, unknown>;
 		} catch {
 			return null;
 		}

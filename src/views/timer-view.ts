@@ -16,7 +16,7 @@ export class TimerModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("ln-timer-modal");
 
-		contentEl.createEl("h3", { text: "Rest Timer" });
+		contentEl.createEl("h3", { text: "Rest timer" });
 
 		this.timerDisplay = new TimerDisplay(
 			contentEl,

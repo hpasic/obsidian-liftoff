@@ -237,7 +237,7 @@ export class ExerciseCard {
 				intervals: state.intervals,
 				sets: state.completed
 					? Array.from({ length: state.intervals }, () => ({
-						weight: 0, reps: 0, unit: this.settings.weightUnit as "kg" | "lbs", completed: true,
+						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
 					}))
 					: [],
 			};

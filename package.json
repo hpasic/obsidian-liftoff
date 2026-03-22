@@ -7,14 +7,24 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"lint": "eslint src/",
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},
-	"keywords": ["obsidian", "workout", "gym", "fitness"],
+	"keywords": [
+		"obsidian",
+		"workout",
+		"gym",
+		"fitness"
+	],
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^18.0.0",
+		"@typescript-eslint/eslint-plugin": "^8.57.1",
+		"@typescript-eslint/parser": "^8.57.1",
 		"esbuild": "0.25.5",
+		"eslint": "^9.39.4",
+		"eslint-plugin-obsidianmd": "github:obsidianmd/eslint-plugin",
 		"tslib": "2.4.0",
 		"typescript": "^5.8.3",
 		"vitest": "^3.0.0"

@@ -24,7 +24,7 @@ export class WorkoutStore {
 
 		await this.ensureFolder(folderPath);
 
-		const existingFiles = await this.getFilenamesInFolder(folderPath);
+		const existingFiles = this.getFilenamesInFolder(folderPath);
 		const filename = generateWorkoutFilename(workout.date, workout.template, existingFiles);
 		const filePath = normalizePath(`${folderPath}/${filename}`);
 
@@ -32,7 +32,7 @@ export class WorkoutStore {
 		return await this.app.vault.create(filePath, content);
 	}
 
-	async getRecentWorkouts(limit: number = 10): Promise<RecentWorkout[]> {
+	getRecentWorkouts(limit: number = 10): RecentWorkout[] {
 		const settings = this.getSettings();
 		const folderPath = normalizePath(settings.workoutFolder);
 		const folder = this.app.vault.getAbstractFileByPath(folderPath);
@@ -53,10 +53,10 @@ export class WorkoutStore {
 			workouts.push({
 				filename: file.basename,
 				path: file.path,
-				template: fm.template ?? null,
-				date: fm.date ?? file.basename.substring(0, 10),
-				duration: fm.duration ?? null,
-				exerciseCount: Array.isArray(fm.exercises) ? fm.exercises.length : 0,
+				template: (fm.template as string) ?? null,
+				date: (fm.date as string) ?? file.basename.substring(0, 10),
+				duration: (fm.duration as number) ?? null,
+				exerciseCount: Array.isArray(fm.exercises) ? (fm.exercises as unknown[]).length : 0,
 			});
 		}
 
@@ -64,7 +64,7 @@ export class WorkoutStore {
 		return workouts.slice(0, limit);
 	}
 
-	async parseWorkoutFile(path: string): Promise<Workout | null> {
+	parseWorkoutFile(path: string): Workout | null {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (!(file instanceof TFile)) return null;
 
@@ -74,7 +74,7 @@ export class WorkoutStore {
 
 		const exercises: Exercise[] = [];
 		if (Array.isArray(fm.exercises)) {
-			for (const ex of fm.exercises) {
+			for (const ex of fm.exercises as Array<Record<string, unknown>>) {
 				const isTimer = ex.exerciseType === "timer";
 				if (isTimer) {
 					exercises.push({
@@ -88,7 +88,7 @@ export class WorkoutStore {
 				} else {
 					const sets: WorkoutSet[] = [];
 					if (Array.isArray(ex.sets)) {
-						for (const s of ex.sets) {
+						for (const s of ex.sets as Array<Record<string, unknown>>) {
 							sets.push({
 								weight: Number(s.weight) || 0,
 								reps: Number(s.reps) || 0,
@@ -107,7 +107,7 @@ export class WorkoutStore {
 
 		return {
 			type: "workout",
-			template: fm.template ?? null,
+			template: (fm.template as string) ?? null,
 			date: String(fm.date),
 			start: String(fm.start ?? ""),
 			end: fm.end ? String(fm.end) : null,
@@ -123,7 +123,7 @@ export class WorkoutStore {
 		}
 	}
 
-	private async getFilenamesInFolder(folderPath: string): Promise<string[]> {
+	private getFilenamesInFolder(folderPath: string): string[] {
 		const folder = this.app.vault.getAbstractFileByPath(folderPath);
 		if (!(folder instanceof TFolder)) return [];
 		return folder.children

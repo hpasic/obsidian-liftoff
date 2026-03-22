@@ -223,7 +223,7 @@ export class TimerBlock {
 	}
 
 	private updateCountdown(): void {
-		const el = this.containerEl.querySelector(".ln-timer-block-countdown") as HTMLElement | null;
+		const el = this.containerEl.querySelector(".ln-timer-block-countdown");
 		if (el) {
 			el.textContent = this.formatTime(Math.max(0, this.countdown));
 		}
