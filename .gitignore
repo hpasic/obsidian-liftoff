@@ -7,3 +7,7 @@ data.json
 # Internal docs and AI config
 docs/
 .claude/
+screenshot.png
+
+# Test vault
+test-vault/
