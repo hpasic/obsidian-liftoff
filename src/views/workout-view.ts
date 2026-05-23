@@ -19,6 +19,7 @@ export class WorkoutView extends ItemView {
 	private restTimerIntervalId: number | null = null;
 	private restStartTime: number | null = null;
 	private restTimerEl: HTMLElement | null = null;
+	private activeRestExerciseIndex: number | null = null;
 	private recentWorkouts: Workout[] = [];
 	private initialized = false;
 
@@ -170,8 +171,8 @@ export class WorkoutView extends ItemView {
 			new TimerModal(this.app, this.plugin.settings).open();
 		});
 
-		// Rest timer (hidden until a set is completed)
-		this.restTimerEl = container.createDiv({ cls: "ln-rest-timer ln-rest-timer-hidden" });
+		// Rest timer element \u2014 detached; mounts next to whichever card just completed a set
+		this.restTimerEl = createDiv({ cls: "ln-rest-timer ln-rest-timer-hidden" });
 		this.restTimerEl.createSpan({ cls: "ln-rest-timer-label", text: "Rest" });
 		this.restTimerEl.createSpan({ cls: "ln-rest-timer-value", text: "0:00" });
 		const dismissBtn = this.restTimerEl.createEl("button", {
@@ -184,8 +185,10 @@ export class WorkoutView extends ItemView {
 
 		// Exercise cards
 		const exercisesEl = container.createDiv({ cls: "ln-exercises" });
-		for (const exercise of this.workout.exercises) {
+		for (let i = 0; i < this.workout.exercises.length; i++) {
+			const exercise = this.workout.exercises[i]!;
 			const lastData = findLastSetsForExercise(this.recentWorkouts, exercise.name);
+			const cardIndex = i;
 			const card = new ExerciseCard(
 				exercisesEl,
 				exercise,
@@ -194,11 +197,16 @@ export class WorkoutView extends ItemView {
 				{
 					onExerciseChanged: () => {},
 					onSetCompleted: () => {
-						this.startRestTimer();
+						this.startRestTimerAt(cardIndex);
 					},
 				}
 			);
 			this.exerciseCards.push(card);
+		}
+
+		// If a rest timer was active before re-render, re-mount it under the same card
+		if (this.activeRestExerciseIndex !== null && this.restTimerIntervalId !== null) {
+			this.mountRestTimerAt(this.activeRestExerciseIndex);
 		}
 
 		// Bottom actions
@@ -240,12 +248,15 @@ export class WorkoutView extends ItemView {
 		});
 	}
 
-	private startRestTimer(): void {
+	private startRestTimerAt(exerciseIndex: number): void {
 		if (this.restTimerIntervalId !== null) {
 			window.clearInterval(this.restTimerIntervalId);
 		}
 
 		this.restStartTime = Date.now();
+		this.activeRestExerciseIndex = exerciseIndex;
+
+		this.mountRestTimerAt(exerciseIndex);
 
 		if (this.restTimerEl) {
 			this.restTimerEl.removeClass("ln-rest-timer-hidden");
@@ -263,14 +274,23 @@ export class WorkoutView extends ItemView {
 		}, 1000);
 	}
 
+	private mountRestTimerAt(exerciseIndex: number): void {
+		if (!this.restTimerEl) return;
+		const card = this.exerciseCards[exerciseIndex];
+		if (!card) return;
+		card.getRootEl().insertAdjacentElement("afterend", this.restTimerEl);
+	}
+
 	private stopRestTimer(): void {
 		if (this.restTimerIntervalId !== null) {
 			window.clearInterval(this.restTimerIntervalId);
 			this.restTimerIntervalId = null;
 		}
 		this.restStartTime = null;
+		this.activeRestExerciseIndex = null;
 		if (this.restTimerEl) {
 			this.restTimerEl.addClass("ln-rest-timer-hidden");
+			this.restTimerEl.remove();
 		}
 	}
 

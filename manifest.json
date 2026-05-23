@@ -1,8 +1,8 @@
 {
 	"id": "liftoff",
 	"name": "LiftOff",
-	"version": "0.1.0",
-	"minAppVersion": "1.0.0",
+	"version": "0.1.1",
+	"minAppVersion": "1.7.2",
 	"description": "Mobile-first gym workout tracker. Log sets, reps, and weights with speed-optimized UX. Data stored as markdown in your vault.",
 	"author": "Haris Pasic",
 	"isDesktopOnly": false

@@ -43,7 +43,7 @@ export class ExercisePickerModal extends Modal {
 			this.updateResults(this.searchInput.value);
 		});
 
-		setTimeout(() => this.searchInput.focus(), 50);
+		window.activeWindow.setTimeout(() => this.searchInput.focus(), 50);
 
 		this.updateResults("");
 	}

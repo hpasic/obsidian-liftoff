@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-liftoff",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Mobile-first gym workout tracker for Obsidian",
 	"main": "main.js",
 	"type": "module",

@@ -170,7 +170,7 @@ export class ExerciseLibraryModal extends Modal {
 			this.renderList();
 		});
 
-		setTimeout(() => nameInput.focus(), 50);
+		window.activeWindow.setTimeout(() => nameInput.focus(), 50);
 	}
 
 	private save(): void {

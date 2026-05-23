@@ -226,6 +226,10 @@ export class ExerciseCard {
 		this.render();
 	}
 
+	getRootEl(): HTMLElement {
+		return this.containerEl;
+	}
+
 	getExercise(): Exercise {
 		if (this.isTimer && this.timerBlock) {
 			const state = this.timerBlock.getState();

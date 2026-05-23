@@ -8,6 +8,8 @@ data.json
 # Internal docs and AI config
 docs/
 .claude/
+CLAUDE.md
+AGENTS.md
 screenshot.png
 
 # Test vault
