@@ -318,9 +318,9 @@
 	color: var(--text-faint);
 }
 
-.ln-set-input {
+.ln-exercise-card .ln-set-input {
 	padding: 10px 8px;
-	border-radius: 8px !important;
+	border-radius: 8px;
 	border: none;
 	text-align: center;
 	font-size: 15px;
@@ -329,8 +329,8 @@
 	min-height: 44px;
 	box-sizing: border-box;
 	width: 100%;
-	-webkit-appearance: none !important;
-	appearance: none !important;
+	-webkit-appearance: none;
+	appearance: none;
 }
 
 .ln-set-input:focus {
@@ -413,9 +413,9 @@
 	margin-bottom: 12px;
 }
 
-.ln-timer-block-input {
+.ln-timer-block .ln-timer-block-input {
 	padding: 10px 8px;
-	border-radius: 8px !important;
+	border-radius: 8px;
 	border: none;
 	text-align: center;
 	font-size: 16px;
@@ -425,8 +425,8 @@
 	min-height: 44px;
 	box-sizing: border-box;
 	width: 100%;
-	-webkit-appearance: none !important;
-	appearance: none !important;
+	-webkit-appearance: none;
+	appearance: none;
 }
 
 .ln-timer-block-input:focus {
