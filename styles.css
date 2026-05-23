@@ -811,6 +811,11 @@
 	font-weight: 500;
 }
 
+/* Mobile: extra bottom padding so the last picker items can be scrolled above the on-screen keyboard */
+.is-mobile .ln-exercise-picker {
+	padding-bottom: calc(30vh + env(safe-area-inset-bottom, 0px));
+}
+
 /* --- Timer --- */
 .ln-timer-modal .modal-content {
 	padding: 16px;
