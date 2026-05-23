@@ -39,6 +39,11 @@ export interface WorkoutTemplate {
 	exercises: TemplateExercise[];
 }
 
+export interface ActiveWorkout {
+	workout: Workout;
+	startTimeMs: number;
+}
+
 export interface ExerciseLibraryEntry {
 	name: string;
 	exerciseType?: ExerciseType;

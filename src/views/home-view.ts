@@ -36,6 +36,8 @@ export class HomeView extends ItemView {
 		container.empty();
 		container.addClass("ln-home-view");
 
+		this.renderActiveWorkoutBanner(container);
+
 		const startBtn = container.createEl("button", {
 			cls: "ln-start-workout-btn",
 			text: "+ start empty workout",
@@ -87,6 +89,53 @@ export class HomeView extends ItemView {
 
 		const recentList = recentSection.createDiv({ cls: "ln-recent-list" });
 		this.renderRecentWorkouts(recentList);
+	}
+
+	private renderActiveWorkoutBanner(containerEl: HTMLElement): void {
+		const active = this.plugin.activeWorkout;
+		if (!active) return;
+
+		const banner = containerEl.createDiv({ cls: "ln-active-workout-banner" });
+
+		const info = banner.createDiv({ cls: "ln-active-workout-info" });
+		info.createDiv({
+			cls: "ln-active-workout-label",
+			text: "Workout in progress",
+		});
+		const completedSets = active.workout.exercises.reduce(
+			(n, e) => n + e.sets.filter((s) => s.completed).length,
+			0
+		);
+		info.createDiv({
+			cls: "ln-active-workout-meta",
+			text: `${active.workout.template ?? "Workout"} · ${completedSets} set${completedSets === 1 ? "" : "s"} logged`,
+		});
+
+		const actions = banner.createDiv({ cls: "ln-active-workout-actions" });
+		const resumeBtn = actions.createEl("button", {
+			cls: "ln-resume-workout-btn",
+			text: "Resume",
+		});
+		resumeBtn.addEventListener("click", () => {
+			void this.plugin.resumeActiveWorkout();
+		});
+
+		const discardBtn = actions.createEl("button", {
+			cls: "ln-discard-workout-btn",
+			text: "×",
+		});
+		discardBtn.setAttr("aria-label", "Discard workout");
+		discardBtn.addEventListener("click", () => {
+			void (async () => {
+				const confirmed = await new ConfirmModal(
+					this.app,
+					"Discard this in-progress workout? Logged sets will be lost."
+				).openAndWait();
+				if (!confirmed) return;
+				await this.plugin.clearActiveWorkout();
+				await this.renderHome();
+			})();
+		});
 	}
 
 	private async renderTemplates(containerEl: HTMLElement): Promise<void> {

@@ -1,18 +1,31 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, type LiftOffSettings, type WorkoutTemplate } from "./types";
+import { Plugin, WorkspaceLeaf, Notice } from "obsidian";
+import {
+	DEFAULT_SETTINGS,
+	type ActiveWorkout,
+	type LiftOffSettings,
+	type Workout,
+	type WorkoutTemplate,
+} from "./types";
 import { LiftOffSettingTab } from "./settings";
 import { WorkoutStore } from "./storage/workout-store";
 import { TemplateStore } from "./storage/template-store";
 import { HomeView, HOME_VIEW_TYPE } from "./views/home-view";
 import { WorkoutView, WORKOUT_VIEW_TYPE } from "./views/workout-view";
+import { ConfirmModal } from "./components/modals";
+
+interface PluginData {
+	settings: LiftOffSettings;
+	activeWorkout: ActiveWorkout | null;
+}
 
 export default class LiftOffPlugin extends Plugin {
 	settings: LiftOffSettings = DEFAULT_SETTINGS;
+	activeWorkout: ActiveWorkout | null = null;
 	workoutStore: WorkoutStore = null!;
 	templateStore: TemplateStore = null!;
 
 	async onload() {
-		await this.loadSettings();
+		await this.loadPluginData();
 
 		this.workoutStore = new WorkoutStore(this.app, () => this.settings);
 		this.templateStore = new TemplateStore(this.app, () => this.settings);
@@ -39,6 +52,18 @@ export default class LiftOffPlugin extends Plugin {
 			name: "Start empty workout",
 			callback: () => {
 				void this.startWorkout(null);
+			},
+		});
+
+		this.addCommand({
+			id: "resume-active-workout",
+			name: "Resume active workout",
+			checkCallback: (checking) => {
+				if (!this.activeWorkout) return false;
+				if (!checking) {
+					void this.resumeActiveWorkout();
+				}
+				return true;
 			},
 		});
 	}
@@ -72,6 +97,18 @@ export default class LiftOffPlugin extends Plugin {
 	}
 
 	async startWorkout(template: WorkoutTemplate | null): Promise<void> {
+		if (this.activeWorkout) {
+			const discard = await new ConfirmModal(
+				this.app,
+				"You have a workout in progress. Discard it and start a new one?"
+			).openAndWait();
+			if (!discard) {
+				await this.resumeActiveWorkout();
+				return;
+			}
+			await this.clearActiveWorkout();
+		}
+
 		const leaf = this.getOrCreateLeaf();
 
 		// Clean up any extra leaves
@@ -98,11 +135,65 @@ export default class LiftOffPlugin extends Plugin {
 		}
 	}
 
-	async loadSettings() {
-		this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<LiftOffSettings>) };
+	async resumeActiveWorkout(): Promise<void> {
+		const active = this.activeWorkout;
+		if (!active) {
+			new Notice("No workout in progress.");
+			return;
+		}
+
+		const leaf = this.getOrCreateLeaf();
+
+		for (const l of this.app.workspace.getLeavesOfType(HOME_VIEW_TYPE)) {
+			if (l !== leaf) l.detach();
+		}
+		for (const l of this.app.workspace.getLeavesOfType(WORKOUT_VIEW_TYPE)) {
+			if (l !== leaf) l.detach();
+		}
+
+		await leaf.setViewState({
+			type: WORKOUT_VIEW_TYPE,
+			active: true,
+		});
+		await this.app.workspace.revealLeaf(leaf);
+
+		const view = leaf.view;
+		if (view instanceof WorkoutView) {
+			view.resume(active);
+		}
+	}
+
+	async persistActiveWorkout(workout: Workout, startTimeMs: number): Promise<void> {
+		this.activeWorkout = { workout, startTimeMs };
+		await this.savePluginData();
+	}
+
+	async clearActiveWorkout(): Promise<void> {
+		this.activeWorkout = null;
+		await this.savePluginData();
+	}
+
+	async loadPluginData() {
+		const raw = (await this.loadData()) as Partial<PluginData & LiftOffSettings> | null;
+		if (raw && typeof raw === "object" && "settings" in raw && raw.settings) {
+			this.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
+			this.activeWorkout = raw.activeWorkout ?? null;
+		} else {
+			// Legacy shape: data.json was the settings object itself.
+			this.settings = { ...DEFAULT_SETTINGS, ...(raw as Partial<LiftOffSettings> | null) };
+			this.activeWorkout = null;
+		}
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+		await this.savePluginData();
+	}
+
+	private async savePluginData(): Promise<void> {
+		const data: PluginData = {
+			settings: this.settings,
+			activeWorkout: this.activeWorkout,
+		};
+		await this.saveData(data);
 	}
 }

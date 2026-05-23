@@ -35,6 +35,72 @@
 }
 
 /* --- Home View --- */
+.ln-active-workout-banner {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 16px;
+	margin-bottom: 16px;
+	border-radius: 12px;
+	background: var(--background-modifier-success-rgb, var(--background-secondary));
+	background-color: var(--background-secondary);
+	border-left: 4px solid var(--interactive-accent);
+}
+
+.ln-active-workout-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.ln-active-workout-label {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	opacity: 0.6;
+	margin-bottom: 2px;
+}
+
+.ln-active-workout-meta {
+	font-size: 14px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ln-active-workout-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.ln-resume-workout-btn {
+	padding: 8px 14px;
+	font-size: 13px;
+	font-weight: 600;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.ln-discard-workout-btn {
+	width: 32px;
+	height: 32px;
+	font-size: 18px;
+	line-height: 1;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.ln-discard-workout-btn:active {
+	background: var(--background-modifier-hover);
+}
+
 .ln-start-workout-btn {
 	width: 100%;
 	padding: 16px;

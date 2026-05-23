@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type LiftOffPlugin from "../main";
-import type { Workout, Exercise, ExerciseType } from "../types";
+import type { ActiveWorkout, Workout, Exercise, ExerciseType } from "../types";
 import type { WorkoutTemplate } from "../types";
 import { ExerciseCard } from "../components/exercise-card";
 import { ExercisePickerModal } from "../components/exercise-picker";
@@ -93,12 +93,22 @@ export class WorkoutView extends ItemView {
 		this.loadRecentWorkouts();
 		this.autoFillFromHistory();
 		this.renderWorkout();
+		void this.persistState();
 	}
 
 	startEmpty(): void {
 		this.initialized = true;
 		this.workout = this.createEmptyWorkout();
 		this.startTime = new Date();
+		this.loadRecentWorkouts();
+		this.renderWorkout();
+		void this.persistState();
+	}
+
+	resume(active: ActiveWorkout): void {
+		this.initialized = true;
+		this.workout = active.workout;
+		this.startTime = new Date(active.startTimeMs);
 		this.loadRecentWorkouts();
 		this.renderWorkout();
 	}
@@ -137,13 +147,31 @@ export class WorkoutView extends ItemView {
 
 	onOpen(): Promise<void> {
 		// If not freshly started via startEmpty/startFromTemplate,
-		// this is a workspace restoration — redirect to home.
+		// this is a workspace restoration — resume the saved active workout if any,
+		// otherwise redirect to home.
 		window.setTimeout(() => {
-			if (!this.initialized) {
+			if (this.initialized) return;
+			const active = this.plugin.activeWorkout;
+			if (active) {
+				this.resume(active);
+			} else {
 				void this.plugin.showHomeView();
 			}
 		}, 100);
 		return Promise.resolve();
+	}
+
+	private collectWorkout(): Workout {
+		if (this.exerciseCards.length === 0) return this.workout;
+		return {
+			...this.workout,
+			exercises: this.exerciseCards.map((c) => c.getExercise()),
+		};
+	}
+
+	private async persistState(): Promise<void> {
+		if (!this.initialized) return;
+		await this.plugin.persistActiveWorkout(this.collectWorkout(), this.startTime.getTime());
 	}
 
 	private renderWorkout(): void {
@@ -195,9 +223,12 @@ export class WorkoutView extends ItemView {
 				lastData,
 				this.plugin.settings,
 				{
-					onExerciseChanged: () => {},
+					onExerciseChanged: () => {
+						void this.persistState();
+					},
 					onSetCompleted: () => {
 						this.startRestTimerAt(cardIndex);
+						void this.persistState();
 					},
 				}
 			);
@@ -356,6 +387,7 @@ export class WorkoutView extends ItemView {
 
 		this.workout.exercises.push(newExercise);
 		this.renderWorkout();
+		void this.persistState();
 	}
 
 	private async finishWorkout(): Promise<void> {
@@ -383,6 +415,7 @@ export class WorkoutView extends ItemView {
 
 		try {
 			await this.plugin.workoutStore.saveWorkout(this.workout);
+			await this.plugin.clearActiveWorkout();
 			new Notice("Workout saved!");
 			void this.plugin.showHomeView();
 		} catch (e) {
