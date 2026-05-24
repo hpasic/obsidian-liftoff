@@ -1,5 +1,10 @@
 import type { WorkoutSet } from "../types";
 
+function parseWeight(value: string): number {
+	const n = parseFloat(value.replace(",", "."));
+	return Number.isFinite(n) ? n : 0;
+}
+
 export interface SetRowCallbacks {
 	onSetChanged: (set: WorkoutSet) => void;
 	onSetCompleted: (set: WorkoutSet) => void;
@@ -46,17 +51,17 @@ export class SetRow {
 		this.weightInput = this.containerEl.createEl("input", {
 			cls: "ln-set-input ln-weight-input",
 			attr: {
-				type: "number",
+				type: "text",
 				inputmode: "decimal",
+				pattern: "[0-9]*[.,]?[0-9]*",
 				placeholder: this.previousHint?.split("x")[0]?.trim() ?? "",
-				step: "0.5",
 			},
 		});
 		if (this.set.weight > 0) {
 			this.weightInput.value = String(this.set.weight);
 		}
 		this.weightInput.addEventListener("input", () => {
-			this.set.weight = parseFloat(this.weightInput.value) || 0;
+			this.set.weight = parseWeight(this.weightInput.value);
 			this.callbacks.onSetChanged(this.set);
 		});
 
@@ -84,7 +89,7 @@ export class SetRow {
 		});
 		this.checkBtn.addEventListener("click", () => {
 			this.set.completed = !this.set.completed;
-			this.set.weight = parseFloat(this.weightInput.value) || 0;
+			this.set.weight = parseWeight(this.weightInput.value);
 			this.set.reps = parseInt(this.repsInput.value, 10) || 0;
 			this.render();
 			this.callbacks.onSetCompleted(this.set);
