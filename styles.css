@@ -360,11 +360,30 @@
 /* --- Set Row --- */
 .ln-set-row {
 	display: grid;
-	grid-template-columns: 28px 90px 90px 44px;
+	grid-template-columns: 28px 90px 90px 44px 44px;
 	gap: 8px;
 	align-items: center;
 	justify-content: center;
 	margin-bottom: 8px;
+}
+
+.ln-set-remove {
+	min-height: 44px;
+	min-width: 44px;
+	padding: 12px;
+	border-radius: 8px;
+	border: 1.5px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-faint);
+	font-size: 18px;
+	line-height: 1;
+	text-align: center;
+	cursor: pointer;
+}
+
+.ln-set-remove:hover,
+.ln-set-remove:active {
+	color: var(--text-error);
 }
 
 .ln-set-row.ln-set-header {

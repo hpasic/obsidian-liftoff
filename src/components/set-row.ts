@@ -8,6 +8,7 @@ function parseWeight(value: string): number {
 export interface SetRowCallbacks {
 	onSetChanged: (set: WorkoutSet) => void;
 	onSetCompleted: (set: WorkoutSet) => void;
+	onSetRemoved: () => void;
 }
 
 export class SetRow {
@@ -93,6 +94,16 @@ export class SetRow {
 			this.set.reps = parseInt(this.repsInput.value, 10) || 0;
 			this.render();
 			this.callbacks.onSetCompleted(this.set);
+		});
+
+		// Remove button
+		const removeBtn = this.containerEl.createEl("button", {
+			cls: "ln-set-remove",
+			text: "×",
+			attr: { "aria-label": "Remove set" },
+		});
+		removeBtn.addEventListener("click", () => {
+			this.callbacks.onSetRemoved();
 		});
 	}
 

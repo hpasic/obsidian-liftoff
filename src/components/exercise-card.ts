@@ -143,6 +143,7 @@ export class ExerciseCard {
 		colHeaders.createSpan({ cls: "ln-set-input", text: this.settings.weightUnit.toUpperCase() });
 		colHeaders.createSpan({ cls: "ln-set-input", text: "REPS" });
 		colHeaders.createSpan({ cls: "ln-set-check", text: "" });
+		colHeaders.createSpan({ cls: "ln-set-remove", text: "" });
 
 		// Previous hint
 		if (this.lastData && this.lastData.sets.length > 0) {
@@ -203,6 +204,11 @@ export class ExerciseCard {
 						if (updatedSet.completed) {
 							this.callbacks.onSetCompleted?.(updatedSet);
 						}
+					},
+					onSetRemoved: () => {
+						this.exercise.sets.splice(i, 1);
+						this.render();
+						this.callbacks.onExerciseChanged(this.exercise);
 					},
 				}
 			);
