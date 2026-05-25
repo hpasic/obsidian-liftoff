@@ -130,12 +130,9 @@ export class SetRow {
 		return this.containerEl;
 	}
 
-	flashPR(kinds: PRKind[]): void {
+	showPR(kinds: PRKind[]): void {
+		this.clearPR();
 		if (kinds.length === 0) return;
-		const existing = this.containerEl.parentElement?.querySelector(
-			`.ln-pr-badge[data-row="${this.setNumber}"]`
-		);
-		existing?.remove();
 
 		const badge = createDiv({ cls: "ln-pr-badge" });
 		badge.setAttr("data-row", String(this.setNumber));
@@ -146,10 +143,14 @@ export class SetRow {
 		});
 		this.containerEl.insertAdjacentElement("afterend", badge);
 		this.containerEl.addClass("ln-set-pr");
+	}
 
-		window.setTimeout(() => {
-			badge.remove();
-		}, 4000);
+	clearPR(): void {
+		this.containerEl.removeClass("ln-set-pr");
+		const existing = this.containerEl.parentElement?.querySelector(
+			`.ln-pr-badge[data-row="${this.setNumber}"]`
+		);
+		existing?.remove();
 	}
 
 	destroy(): void {

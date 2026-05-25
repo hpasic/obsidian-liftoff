@@ -1,6 +1,6 @@
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
-import { applyToBests, detectPRs, type PRBests } from "../utils/sets";
+import { applyToBests, detectPRs, type PRBests, type PRKind } from "../utils/sets";
 import { DurationSetRow } from "./duration-set-row";
 import { SetRow } from "./set-row";
 import { TimerBlock } from "./timer-block";
@@ -22,6 +22,7 @@ export class ExerciseCard {
 	private timerBlock: TimerBlock | null = null;
 	private expanded: boolean;
 	private bests: PRBests;
+	private prKindsByIndex: Map<number, PRKind[]> = new Map();
 
 	constructor(
 		parentEl: HTMLElement,
@@ -280,21 +281,42 @@ export class ExerciseCard {
 						if (updatedSet.completed) {
 							const prs = detectPRs(updatedSet, this.bests);
 							if (prs.length > 0) {
-								row.flashPR(prs);
+								this.prKindsByIndex.set(i, prs);
+								row.showPR(prs);
 								applyToBests(updatedSet, this.bests);
 							}
 							this.callbacks.onSetCompleted?.(updatedSet);
+						} else {
+							// Unchecked — clear any badge for this row
+							this.prKindsByIndex.delete(i);
+							row.clearPR();
 						}
 					},
 					onSetRemoved: () => {
 						this.exercise.sets.splice(i, 1);
+						this.shiftPrKindsForRemoval(i);
 						this.render();
 						this.callbacks.onExerciseChanged(this.exercise);
 					},
 				}
 			);
 			this.setRows.push(row);
+
+			const existingPr = this.prKindsByIndex.get(i);
+			if (existingPr && existingPr.length > 0) {
+				row.showPR(existingPr);
+			}
 		}
+	}
+
+	private shiftPrKindsForRemoval(removedIndex: number): void {
+		const next: Map<number, PRKind[]> = new Map();
+		for (const [idx, kinds] of this.prKindsByIndex) {
+			if (idx < removedIndex) next.set(idx, kinds);
+			else if (idx > removedIndex) next.set(idx - 1, kinds);
+			// idx === removedIndex is dropped
+		}
+		this.prKindsByIndex = next;
 	}
 
 	private formatTime(seconds: number): string {
