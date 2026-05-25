@@ -93,3 +93,85 @@ describe("timer exercise markdown body", () => {
 		expect(result).not.toContain("Weight");
 	});
 });
+
+describe("duration exercise serialization", () => {
+	const durationWorkout: Workout = {
+		type: "workout",
+		template: null,
+		date: "2026-05-25",
+		start: "10:00",
+		end: "10:20",
+		duration: 20,
+		exercises: [
+			{
+				name: "Plank",
+				exerciseType: "duration",
+				sets: [
+					{ weight: 0, reps: 0, unit: "kg", completed: true, durationSeconds: 60 },
+					{ weight: 0, reps: 0, unit: "kg", completed: true, durationSeconds: 75 },
+				],
+			},
+		],
+	};
+
+	it("emits exerciseType: duration and durationSeconds per set in frontmatter", () => {
+		const result = workoutToFrontmatter(durationWorkout);
+		expect(result).toContain("exerciseType: duration");
+		expect(result).toContain("durationSeconds: 60");
+		expect(result).toContain("durationSeconds: 75");
+		expect(result).not.toContain("weight: 0");
+	});
+
+	it("renders Set | Time table in markdown body", () => {
+		const result = workoutToMarkdownBody(durationWorkout);
+		expect(result).toContain("## Plank");
+		expect(result).toContain("| Set | Time |");
+		expect(result).toContain("1:00");
+		expect(result).toContain("1:15");
+		expect(result).not.toContain("Weight");
+	});
+});
+
+describe("setType serialization", () => {
+	it("omits setType for working sets (default)", () => {
+		const result = workoutToFrontmatter(sampleWorkout);
+		expect(result).not.toContain("setType");
+	});
+
+	it("emits non-working setType in frontmatter", () => {
+		const w: Workout = {
+			...sampleWorkout,
+			exercises: [
+				{
+					name: "Squat",
+					sets: [
+						{ weight: 60, reps: 10, unit: "kg", completed: true, setType: "warmup" },
+						{ weight: 100, reps: 5, unit: "kg", completed: true, setType: "failure" },
+					],
+				},
+			],
+		};
+		const result = workoutToFrontmatter(w);
+		expect(result).toContain("setType: warmup");
+		expect(result).toContain("setType: failure");
+	});
+
+	it("annotates non-working set types in the body table", () => {
+		const w: Workout = {
+			...sampleWorkout,
+			exercises: [
+				{
+					name: "Squat",
+					sets: [
+						{ weight: 60, reps: 10, unit: "kg", completed: true, setType: "warmup" },
+						{ weight: 100, reps: 5, unit: "kg", completed: true },
+						{ weight: 80, reps: 8, unit: "kg", completed: true, setType: "drop" },
+					],
+				},
+			],
+		};
+		const result = workoutToMarkdownBody(w);
+		expect(result).toContain("1 (W)");
+		expect(result).toContain("3 (drop)");
+	});
+});

@@ -1,10 +1,15 @@
-export type ExerciseType = "weight" | "timer";
+export type ExerciseType = "weight" | "timer" | "duration";
+
+export type SetType = "warmup" | "working" | "drop" | "failure";
 
 export interface WorkoutSet {
 	weight: number;
 	reps: number;
 	unit: "kg" | "lbs";
 	completed: boolean;
+	setType?: SetType;
+	/** For duration-type exercises: elapsed seconds the user held. */
+	durationSeconds?: number;
 }
 
 export interface Exercise {

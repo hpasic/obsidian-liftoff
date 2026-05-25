@@ -1,5 +1,7 @@
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
+import { applyToBests, detectPRs, type PRBests } from "../utils/sets";
+import { DurationSetRow } from "./duration-set-row";
 import { SetRow } from "./set-row";
 import { TimerBlock } from "./timer-block";
 
@@ -19,14 +21,17 @@ export class ExerciseCard {
 	private setRows: SetRowLike[] = [];
 	private timerBlock: TimerBlock | null = null;
 	private expanded: boolean;
+	private bests: PRBests;
 
 	constructor(
 		parentEl: HTMLElement,
 		private exercise: Exercise,
 		private lastData: LastExerciseData | null,
 		private settings: LiftOffSettings,
+		bests: PRBests,
 		private callbacks: ExerciseCardCallbacks
 	) {
+		this.bests = { ...bests };
 		this.expanded = true;
 		this.containerEl = parentEl.createDiv({ cls: "ln-exercise-card" });
 		this.setsContainerEl = null!;
@@ -35,6 +40,10 @@ export class ExerciseCard {
 
 	private get isTimer(): boolean {
 		return this.exercise.exerciseType === "timer";
+	}
+
+	private get isDuration(): boolean {
+		return this.exercise.exerciseType === "duration";
 	}
 
 	private render(): void {
@@ -61,6 +70,12 @@ export class ExerciseCard {
 			headerRight.createSpan({
 				cls: "ln-exercise-set-count",
 				text: `\u23F1 ${this.exercise.intervals ?? this.settings.defaultWorkDuration}`,
+			});
+		} else if (this.isDuration) {
+			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
+			headerRight.createSpan({
+				cls: "ln-exercise-set-count",
+				text: `\u23F1 ${completedCount}/${this.exercise.sets.length}`,
 			});
 		} else {
 			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
@@ -94,9 +109,70 @@ export class ExerciseCard {
 
 		if (this.isTimer) {
 			this.renderTimer();
+		} else if (this.isDuration) {
+			this.renderDurationSets();
 		} else {
 			this.renderWeightSets();
 		}
+	}
+
+	private renderDurationSets(): void {
+		// Previous hint (longest hold in last session)
+		let prevBest: number | null = null;
+		if (this.lastData && this.lastData.sets.length > 0) {
+			for (const s of this.lastData.sets) {
+				const d = s.durationSeconds ?? 0;
+				if (d > (prevBest ?? 0)) prevBest = d;
+			}
+		}
+
+		this.setsContainerEl = this.containerEl.createDiv({ cls: "ln-sets-container" });
+
+		for (let i = 0; i < this.exercise.sets.length; i++) {
+			const set = this.exercise.sets[i]!;
+			const previousSet = this.lastData?.sets[i];
+			const prev = previousSet?.durationSeconds ?? prevBest;
+
+			const row = new DurationSetRow(
+				this.setsContainerEl,
+				i + 1,
+				set,
+				prev ?? null,
+				{
+					onSetChanged: (updatedSet) => {
+						this.exercise.sets[i] = updatedSet;
+						this.callbacks.onExerciseChanged(this.exercise);
+					},
+					onSetCompleted: (updatedSet) => {
+						this.exercise.sets[i] = updatedSet;
+						this.callbacks.onExerciseChanged(this.exercise);
+						this.callbacks.onSetCompleted?.(updatedSet);
+					},
+					onSetRemoved: () => {
+						this.exercise.sets.splice(i, 1);
+						this.render();
+						this.callbacks.onExerciseChanged(this.exercise);
+					},
+				}
+			);
+			this.setRows.push(row);
+		}
+
+		const addSetBtn = this.containerEl.createDiv({
+			cls: "ln-add-set-btn",
+			text: "+ Add hold",
+		});
+		addSetBtn.addEventListener("click", () => {
+			this.exercise.sets.push({
+				weight: 0,
+				reps: 0,
+				unit: this.settings.weightUnit,
+				completed: false,
+				durationSeconds: 0,
+			});
+			this.render();
+			this.callbacks.onExerciseChanged(this.exercise);
+		});
 	}
 
 	private renderTimer(): void {
@@ -202,6 +278,11 @@ export class ExerciseCard {
 						this.exercise.sets[i] = updatedSet;
 						this.callbacks.onExerciseChanged(this.exercise);
 						if (updatedSet.completed) {
+							const prs = detectPRs(updatedSet, this.bests);
+							if (prs.length > 0) {
+								row.flashPR(prs);
+								applyToBests(updatedSet, this.bests);
+							}
 							this.callbacks.onSetCompleted?.(updatedSet);
 						}
 					},
@@ -261,6 +342,7 @@ export class ExerciseCard {
 
 	destroy(): void {
 		this.timerBlock?.destroy();
+		for (const row of this.setRows) row.destroy();
 		this.containerEl.remove();
 	}
 }

@@ -61,6 +61,8 @@ export class ExerciseLibraryModal extends Modal {
 
 		if (entry.exerciseType === "timer") {
 			nameRow.createSpan({ cls: "ln-el-type-badge", text: "\u23F1" });
+		} else if (entry.exerciseType === "duration") {
+			nameRow.createSpan({ cls: "ln-el-type-badge", text: "\u23F2" });
 		}
 		nameRow.createSpan({ cls: "ln-el-name", text: entry.name });
 
@@ -114,26 +116,35 @@ export class ExerciseLibraryModal extends Modal {
 		typeRow.createSpan({ cls: "ln-el-edit-label", text: "Type" });
 		const typeToggle = typeRow.createDiv({ cls: "ln-el-type-toggle" });
 
+		let currentType: ExerciseType = entry.exerciseType ?? "weight";
+
 		const weightBtn = typeToggle.createEl("button", {
-			cls: `ln-el-type-btn ${entry.exerciseType !== "timer" ? "ln-el-type-btn-active" : ""}`,
+			cls: `ln-el-type-btn ${currentType === "weight" ? "ln-el-type-btn-active" : ""}`,
 			text: "Weight",
 		});
 		const timerBtn = typeToggle.createEl("button", {
-			cls: `ln-el-type-btn ${entry.exerciseType === "timer" ? "ln-el-type-btn-active" : ""}`,
+			cls: `ln-el-type-btn ${currentType === "timer" ? "ln-el-type-btn-active" : ""}`,
 			text: "Timer",
 		});
+		const durationBtn = typeToggle.createEl("button", {
+			cls: `ln-el-type-btn ${currentType === "duration" ? "ln-el-type-btn-active" : ""}`,
+			text: "Duration",
+		});
 
-		let currentType: ExerciseType = entry.exerciseType ?? "weight";
-		weightBtn.addEventListener("click", () => {
-			currentType = "weight";
-			weightBtn.addClass("ln-el-type-btn-active");
-			timerBtn.removeClass("ln-el-type-btn-active");
-		});
-		timerBtn.addEventListener("click", () => {
-			currentType = "timer";
-			timerBtn.addClass("ln-el-type-btn-active");
-			weightBtn.removeClass("ln-el-type-btn-active");
-		});
+		const setActive = (which: ExerciseType): void => {
+			currentType = which;
+			for (const [btn, t] of [
+				[weightBtn, "weight"] as const,
+				[timerBtn, "timer"] as const,
+				[durationBtn, "duration"] as const,
+			]) {
+				if (t === which) btn.addClass("ln-el-type-btn-active");
+				else btn.removeClass("ln-el-type-btn-active");
+			}
+		};
+		weightBtn.addEventListener("click", () => setActive("weight"));
+		timerBtn.addEventListener("click", () => setActive("timer"));
+		durationBtn.addEventListener("click", () => setActive("duration"));
 
 		// Notes
 		row.createDiv({ cls: "ln-el-edit-label", text: "Notes" });

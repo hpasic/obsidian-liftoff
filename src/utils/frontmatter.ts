@@ -1,4 +1,12 @@
 import type { Workout } from "../types";
+import { effectiveSetType } from "./sets";
+
+const SET_TYPE_BODY_LABEL: Record<string, string> = {
+	working: "",
+	warmup: " (W)",
+	drop: " (drop)",
+	failure: " (failure)",
+};
 
 export function workoutToFrontmatter(workout: Workout): string {
 	const lines: string[] = ["---"];
@@ -24,10 +32,28 @@ export function workoutToFrontmatter(workout: Workout): string {
 			lines.push(`    workSeconds: ${exercise.workSeconds ?? 0}`);
 			lines.push(`    restSeconds: ${exercise.restSeconds ?? 0}`);
 			lines.push(`    intervals: ${exercise.intervals ?? 0}`);
+		} else if (exercise.exerciseType === "duration") {
+			lines.push(`    exerciseType: duration`);
+			lines.push("    sets:");
+			for (const set of exercise.sets) {
+				const parts = [`durationSeconds: ${set.durationSeconds ?? 0}`];
+				if (set.setType && set.setType !== "working") {
+					parts.push(`setType: ${set.setType}`);
+				}
+				lines.push(`      - { ${parts.join(", ")} }`);
+			}
 		} else {
 			lines.push("    sets:");
 			for (const set of exercise.sets) {
-				lines.push(`      - { weight: ${set.weight}, reps: ${set.reps}, unit: ${set.unit} }`);
+				const parts = [
+					`weight: ${set.weight}`,
+					`reps: ${set.reps}`,
+					`unit: ${set.unit}`,
+				];
+				if (set.setType && set.setType !== "working") {
+					parts.push(`setType: ${set.setType}`);
+				}
+				lines.push(`      - { ${parts.join(", ")} }`);
 			}
 		}
 	}
@@ -62,13 +88,25 @@ export function workoutToMarkdownBody(workout: Workout): string {
 			const r = formatTime(exercise.restSeconds ?? 0);
 			const n = exercise.intervals ?? 0;
 			lines.push(`Intervals: ${n} \u00D7 ${w} work / ${r} rest`);
+		} else if (exercise.exerciseType === "duration") {
+			lines.push("| Set | Time |");
+			lines.push("|-----|------|");
+			exercise.sets.forEach((set, i) => {
+				const typeSuffix = SET_TYPE_BODY_LABEL[effectiveSetType(set)] ?? "";
+				const setLabel = `${i + 1}${typeSuffix}`;
+				lines.push(
+					`| ${setLabel.padEnd(3)} | ${formatTime(set.durationSeconds ?? 0).padEnd(4)} |`
+				);
+			});
 		} else {
 			lines.push("| Set | Weight | Reps |");
 			lines.push("|-----|--------|------|");
 			exercise.sets.forEach((set, i) => {
 				const weightStr = `${set.weight} ${set.unit}`;
+				const typeSuffix = SET_TYPE_BODY_LABEL[effectiveSetType(set)] ?? "";
+				const setLabel = `${i + 1}${typeSuffix}`;
 				lines.push(
-					`| ${String(i + 1).padEnd(3)} | ${weightStr.padEnd(6)} | ${String(set.reps).padEnd(4)} |`
+					`| ${setLabel.padEnd(3)} | ${weightStr.padEnd(6)} | ${String(set.reps).padEnd(4)} |`
 				);
 			});
 		}
@@ -78,6 +116,7 @@ export function workoutToMarkdownBody(workout: Workout): string {
 	return lines.join("\n").trimEnd();
 }
 
-export function workoutToFullMarkdown(workout: Workout): string {
-	return workoutToFrontmatter(workout) + "\n" + workoutToMarkdownBody(workout) + "\n";
+export function workoutToFullMarkdown(workout: Workout, extraSections: string = ""): string {
+	const tail = extraSections ? "\n\n" + extraSections : "";
+	return workoutToFrontmatter(workout) + "\n" + workoutToMarkdownBody(workout) + tail + "\n";
 }
