@@ -48,6 +48,7 @@ export class ExerciseCard {
 	}
 
 	private render(): void {
+		for (const row of this.setRows) row.destroy();
 		this.containerEl.empty();
 		this.setRows = [];
 		this.timerBlock = null;

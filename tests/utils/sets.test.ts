@@ -48,13 +48,13 @@ describe("setVolume", () => {
 		expect(setVolume(baseSet({ weight: 100, reps: 5 }))).toBe(500);
 	});
 
-	it("includes drop and failure sets in total volume", () => {
-		expect(setVolume(baseSet({ weight: 100, reps: 5, setType: "drop" }))).toBe(500);
+	it("includes failure sets in total volume", () => {
 		expect(setVolume(baseSet({ weight: 100, reps: 5, setType: "failure" }))).toBe(500);
 	});
 
-	it("excludes warmup sets from volume", () => {
+	it("excludes warmup and drop sets from volume", () => {
 		expect(setVolume(baseSet({ weight: 100, reps: 5, setType: "warmup" }))).toBe(0);
+		expect(setVolume(baseSet({ weight: 100, reps: 5, setType: "drop" }))).toBe(0);
 	});
 });
 

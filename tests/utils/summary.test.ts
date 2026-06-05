@@ -74,6 +74,23 @@ describe("buildWorkoutSummary", () => {
 		expect(summary.prs).toHaveLength(0);
 	});
 
+	it("ignores duration exercises in working-set count and volume", () => {
+		const w = workout([
+			{
+				name: "Plank",
+				exerciseType: "duration",
+				sets: [
+					set({ weight: 0, reps: 0, durationSeconds: 30 }),
+					set({ weight: 0, reps: 0, durationSeconds: 45 }),
+				],
+			},
+			{ name: "Bench", sets: [set({ weight: 100, reps: 5 })] },
+		]);
+		const summary = buildWorkoutSummary(w, []);
+		expect(summary.totalWorkingSets).toBe(1);
+		expect(summary.totalVolume).toBe(500);
+	});
+
 	it("excludes warmup sets from volume", () => {
 		const w = workout([
 			{

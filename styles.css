@@ -767,7 +767,8 @@
 	opacity: 0.8;
 }
 
-.ln-exercise-create-timer {
+.ln-exercise-create-timer,
+.ln-exercise-create-duration {
 	color: var(--text-muted);
 }
 

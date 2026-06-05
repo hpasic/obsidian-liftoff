@@ -25,7 +25,7 @@ export function isWorkingSet(set: WorkoutSet): boolean {
 
 export function setVolume(set: WorkoutSet): number {
 	const t = effectiveSetType(set);
-	if (t === "warmup") return 0;
+	if (t === "warmup" || t === "drop") return 0;
 	return set.weight * set.reps;
 }
 

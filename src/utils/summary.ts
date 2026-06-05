@@ -1,5 +1,5 @@
 import type { Workout } from "../types";
-import { computeBests, detectPRs, isWorkingSet, PR_LABEL, type PRKind } from "./sets";
+import { applyToBests, computeBests, detectPRs, isWorkingSet, PR_LABEL, type PRKind } from "./sets";
 
 export interface ExercisePRSummary {
 	exercise: string;
@@ -25,7 +25,7 @@ export function buildWorkoutSummary(workout: Workout, history: Workout[]): Worko
 	const prs: ExercisePRSummary[] = [];
 
 	for (const exercise of workout.exercises) {
-		if (exercise.exerciseType === "timer") continue;
+		if (exercise.exerciseType === "timer" || exercise.exerciseType === "duration") continue;
 
 		const bests = computeBests(history, exercise.name);
 		const seenKinds = new Set<PRKind>();
@@ -39,11 +39,7 @@ export function buildWorkoutSummary(workout: Workout, history: Workout[]): Worko
 				seenKinds.add(kind);
 			}
 			// Absorb into bests so the next set in the same exercise must beat it too
-			if (set.weight > bests.maxWeight) bests.maxWeight = set.weight;
-			const oneRM = set.reps === 1 ? set.weight : set.weight * (1 + set.reps / 30);
-			if (oneRM > bests.maxOneRM) bests.maxOneRM = oneRM;
-			const vol = set.weight * set.reps;
-			if (vol > bests.maxVolume) bests.maxVolume = vol;
+			applyToBests(set, bests);
 		}
 
 		if (seenKinds.size > 0) {

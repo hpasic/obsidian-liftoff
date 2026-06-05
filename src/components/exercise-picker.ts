@@ -127,7 +127,7 @@ export class ExercisePickerModal extends Modal {
 		});
 
 		const durationEl = this.resultsEl.createDiv({
-			cls: "ln-exercise-result ln-exercise-create ln-exercise-create-timer",
+			cls: "ln-exercise-result ln-exercise-create ln-exercise-create-duration",
 			text: `\u23F2 Create "${name}" as duration (max-hold)`,
 		});
 		durationEl.addEventListener("click", () => {
