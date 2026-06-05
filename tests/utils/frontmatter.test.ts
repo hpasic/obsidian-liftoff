@@ -132,6 +132,34 @@ describe("duration exercise serialization", () => {
 	});
 });
 
+describe("exercise note serialization", () => {
+	it("omits the note line when there is no note", () => {
+		const result = workoutToFrontmatter(sampleWorkout);
+		expect(result).not.toContain("note:");
+	});
+
+	it("emits a quoted note in frontmatter and a blockquote in the body", () => {
+		const w: Workout = {
+			...sampleWorkout,
+			exercises: [{ ...sampleWorkout.exercises[0]!, note: "felt strong\ngrip slipping" }],
+		};
+		const fm = workoutToFrontmatter(w);
+		expect(fm).toContain('note: "felt strong\\ngrip slipping"');
+
+		const body = workoutToMarkdownBody(w);
+		expect(body).toContain("> felt strong");
+		expect(body).toContain("> grip slipping");
+	});
+
+	it("escapes embedded double quotes in the frontmatter note", () => {
+		const w: Workout = {
+			...sampleWorkout,
+			exercises: [{ ...sampleWorkout.exercises[0]!, note: 'use the "wide" grip' }],
+		};
+		expect(workoutToFrontmatter(w)).toContain('note: "use the \\"wide\\" grip"');
+	});
+});
+
 describe("setType serialization", () => {
 	it("omits setType for working sets (default)", () => {
 		const result = workoutToFrontmatter(sampleWorkout);

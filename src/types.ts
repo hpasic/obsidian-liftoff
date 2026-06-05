@@ -16,6 +16,8 @@ export interface Exercise {
 	name: string;
 	exerciseType?: ExerciseType;
 	sets: WorkoutSet[];
+	/** Free-text note for this exercise in this workout. */
+	note?: string;
 	// Timer-specific (only used when exerciseType === "timer")
 	workSeconds?: number;
 	restSeconds?: number;

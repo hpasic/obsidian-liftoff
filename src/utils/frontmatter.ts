@@ -8,6 +8,15 @@ const SET_TYPE_BODY_LABEL: Record<string, string> = {
 	failure: " (failure)",
 };
 
+/** Wrap free text as a YAML double-quoted scalar, escaping it so newlines survive a round-trip. */
+function yamlQuote(value: string): string {
+	const escaped = value
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"')
+		.replace(/\n/g, "\\n");
+	return `"${escaped}"`;
+}
+
 export function workoutToFrontmatter(workout: Workout): string {
 	const lines: string[] = ["---"];
 
@@ -27,6 +36,9 @@ export function workoutToFrontmatter(workout: Workout): string {
 	lines.push("exercises:");
 	for (const exercise of workout.exercises) {
 		lines.push(`  - name: ${exercise.name}`);
+		if (exercise.note && exercise.note.trim()) {
+			lines.push(`    note: ${yamlQuote(exercise.note.trim())}`);
+		}
 		if (exercise.exerciseType === "timer") {
 			lines.push(`    exerciseType: timer`);
 			lines.push(`    workSeconds: ${exercise.workSeconds ?? 0}`);
@@ -83,6 +95,13 @@ export function workoutToMarkdownBody(workout: Workout): string {
 
 	for (const exercise of workout.exercises) {
 		lines.push(`## ${exercise.name}`);
+		if (exercise.note && exercise.note.trim()) {
+			for (const noteLine of exercise.note.trim().split("\n")) {
+				lines.push(`> ${noteLine}`);
+			}
+			// Blank line so the table below isn't lazily absorbed into the blockquote
+			lines.push("");
+		}
 		if (exercise.exerciseType === "timer") {
 			const w = formatTime(exercise.workSeconds ?? 0);
 			const r = formatTime(exercise.restSeconds ?? 0);

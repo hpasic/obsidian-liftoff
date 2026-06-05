@@ -350,6 +350,33 @@
 	margin-top: 4px;
 }
 
+.ln-exercise-note-input {
+	width: 100%;
+	box-sizing: border-box;
+	margin: 8px 0 12px;
+	padding: 8px 10px;
+	border: none;
+	border-radius: 8px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 13px;
+	font-family: inherit;
+	line-height: 1.4;
+	resize: none;
+	overflow: hidden;
+	min-height: 36px;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.ln-exercise-note-input::placeholder {
+	color: var(--text-faint);
+}
+
+.ln-exercise-note-input:focus {
+	outline: 2px solid var(--interactive-accent);
+}
+
 .ln-exercise-previous {
 	font-size: 11px;
 	color: var(--text-faint);
@@ -360,7 +387,7 @@
 /* --- Set Row --- */
 .ln-set-row {
 	display: grid;
-	grid-template-columns: 28px 90px 90px 44px 44px;
+	grid-template-columns: 40px 1fr 1fr 44px 44px;
 	gap: 8px;
 	align-items: center;
 	justify-content: center;
@@ -395,6 +422,14 @@
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
 	color: var(--text-faint);
+}
+
+/* Header labels are plain text, not input-styled boxes */
+.ln-exercise-card .ln-set-row.ln-set-header .ln-set-input {
+	background: transparent;
+	border: none;
+	min-height: auto;
+	padding: 0;
 }
 
 .ln-set-number {
@@ -491,7 +526,7 @@
 /* --- Duration Set Row --- */
 .ln-duration-row {
 	display: grid;
-	grid-template-columns: 28px 1fr 90px 44px;
+	grid-template-columns: 40px 1fr 90px 44px;
 	gap: 8px;
 	align-items: center;
 	margin-bottom: 8px;

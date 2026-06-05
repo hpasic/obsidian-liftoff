@@ -111,6 +111,8 @@ export class ExerciseCard {
 			return;
 		}
 
+		this.renderNoteField();
+
 		if (this.isTimer) {
 			this.renderTimer();
 		} else if (this.isDuration) {
@@ -118,6 +120,24 @@ export class ExerciseCard {
 		} else {
 			this.renderWeightSets();
 		}
+	}
+
+	private renderNoteField(): void {
+		const noteEl = this.containerEl.createEl("textarea", {
+			cls: "ln-exercise-note-input",
+			attr: { placeholder: "Add a note…", rows: "1" },
+		});
+		noteEl.value = this.exercise.note ?? "";
+		const autoGrow = () => {
+			noteEl.style.height = "auto";
+			noteEl.style.height = `${noteEl.scrollHeight}px`;
+		};
+		noteEl.addEventListener("input", () => {
+			this.exercise.note = noteEl.value;
+			autoGrow();
+			this.callbacks.onExerciseChanged(this.exercise);
+		});
+		autoGrow();
 	}
 
 	private renderDurationSets(): void {
@@ -222,8 +242,6 @@ export class ExerciseCard {
 		colHeaders.createSpan({ cls: "ln-set-number", text: "SET" });
 		colHeaders.createSpan({ cls: "ln-set-input", text: this.settings.weightUnit.toUpperCase() });
 		colHeaders.createSpan({ cls: "ln-set-input", text: "REPS" });
-		colHeaders.createSpan({ cls: "ln-set-check", text: "" });
-		colHeaders.createSpan({ cls: "ln-set-remove", text: "" });
 
 		// Previous hint
 		if (this.lastData && this.lastData.sets.length > 0) {

@@ -82,11 +82,13 @@ export class WorkoutStore {
 		const exercises: Exercise[] = [];
 		if (Array.isArray(fm.exercises)) {
 			for (const ex of fm.exercises as Array<Record<string, unknown>>) {
+				const note = typeof ex.note === "string" ? ex.note : undefined;
 				if (ex.exerciseType === "timer") {
 					exercises.push({
 						name: String(ex.name),
 						exerciseType: "timer",
 						sets: [],
+						note,
 						workSeconds: Number(ex.workSeconds) || 0,
 						restSeconds: Number(ex.restSeconds) || 0,
 						intervals: Number(ex.intervals) || 0,
@@ -111,6 +113,7 @@ export class WorkoutStore {
 						name: String(ex.name),
 						exerciseType: "duration",
 						sets,
+						note,
 					});
 				} else {
 					const sets: WorkoutSet[] = [];
@@ -130,6 +133,7 @@ export class WorkoutStore {
 					exercises.push({
 						name: String(ex.name),
 						sets,
+						note,
 					});
 				}
 			}
