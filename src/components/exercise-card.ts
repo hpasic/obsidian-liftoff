@@ -21,6 +21,7 @@ export class ExerciseCard {
 	private setRows: SetRowLike[] = [];
 	private timerBlock: TimerBlock | null = null;
 	private expanded: boolean;
+	private historyBests: PRBests;
 	private bests: PRBests;
 	private prKindsByIndex: Map<number, PRKind[]> = new Map();
 
@@ -32,6 +33,7 @@ export class ExerciseCard {
 		bests: PRBests,
 		private callbacks: ExerciseCardCallbacks
 	) {
+		this.historyBests = { ...bests };
 		this.bests = { ...bests };
 		this.expanded = true;
 		this.containerEl = parentEl.createDiv({ cls: "ln-exercise-card" });
@@ -288,9 +290,11 @@ export class ExerciseCard {
 							}
 							this.callbacks.onSetCompleted?.(updatedSet);
 						} else {
-							// Unchecked — clear any badge for this row
+							// Unchecked — clear any badge for this row and roll
+							// back the absorbed best so re-checking can PR again
 							this.prKindsByIndex.delete(i);
 							row.clearPR();
+							this.recomputeBests();
 						}
 					},
 					onSetRemoved: () => {
@@ -318,6 +322,18 @@ export class ExerciseCard {
 			// idx === removedIndex is dropped
 		}
 		this.prKindsByIndex = next;
+	}
+
+	/**
+	 * Rebuild live bests from the immutable history snapshot plus every set
+	 * still marked completed. Called when a set is unchecked so its absorbed
+	 * best is rolled back and re-checking it can register the PR again.
+	 */
+	private recomputeBests(): void {
+		this.bests = { ...this.historyBests };
+		for (const set of this.exercise.sets) {
+			if (set.completed) applyToBests(set, this.bests);
+		}
 	}
 
 	private formatTime(seconds: number): string {
