@@ -96,9 +96,10 @@ export class ExercisePickerModal extends Modal {
 		const item = this.resultsEl.createDiv({
 			cls: "ln-exercise-result",
 		});
-		const label = entry.exerciseType === "timer"
-			? `\u23F1 ${entry.name}`
-			: entry.name;
+		let label: string;
+		if (entry.exerciseType === "timer") label = `\u23F1 ${entry.name}`;
+		else if (entry.exerciseType === "duration") label = `\u23F2 ${entry.name}`;
+		else label = entry.name;
 		item.textContent = label;
 		item.addEventListener("click", () => {
 			this.onSelect(entry.name, entry.exerciseType ?? "weight");
@@ -122,6 +123,15 @@ export class ExercisePickerModal extends Modal {
 		});
 		timerEl.addEventListener("click", () => {
 			this.onSelect(name, "timer");
+			this.close();
+		});
+
+		const durationEl = this.resultsEl.createDiv({
+			cls: "ln-exercise-result ln-exercise-create ln-exercise-create-duration",
+			text: `\u23F2 Create "${name}" as duration (max-hold)`,
+		});
+		durationEl.addEventListener("click", () => {
+			this.onSelect(name, "duration");
 			this.close();
 		});
 	}

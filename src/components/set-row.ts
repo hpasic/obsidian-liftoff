@@ -1,4 +1,11 @@
 import type { WorkoutSet } from "../types";
+import {
+	effectiveSetType,
+	NEXT_SET_TYPE,
+	PR_LABEL,
+	SET_TYPE_LABEL,
+	type PRKind,
+} from "../utils/sets";
 
 function parseWeight(value: string): number {
 	const n = parseFloat(value.replace(",", "."));
@@ -42,10 +49,18 @@ export class SetRow {
 			this.containerEl.removeClass("ln-set-completed");
 		}
 
-		// Set number
-		this.containerEl.createSpan({
-			cls: "ln-set-number",
-			text: String(this.setNumber),
+		// Set number / type cycle button
+		const type = effectiveSetType(this.set);
+		const typeLabel = SET_TYPE_LABEL[type];
+		const setNumberBtn = this.containerEl.createEl("button", {
+			cls: `ln-set-number ln-set-type-${type}`,
+			text: typeLabel || String(this.setNumber),
+			attr: { "aria-label": `Set ${this.setNumber} (${type}). Tap to change type.` },
+		});
+		setNumberBtn.addEventListener("click", () => {
+			this.set.setType = NEXT_SET_TYPE[effectiveSetType(this.set)];
+			this.callbacks.onSetChanged(this.set);
+			this.render();
 		});
 
 		// Weight input
@@ -109,6 +124,33 @@ export class SetRow {
 
 	getSet(): WorkoutSet {
 		return { ...this.set };
+	}
+
+	getRootEl(): HTMLElement {
+		return this.containerEl;
+	}
+
+	showPR(kinds: PRKind[]): void {
+		this.clearPR();
+		if (kinds.length === 0) return;
+
+		const badge = createDiv({ cls: "ln-pr-badge" });
+		badge.setAttr("data-row", String(this.setNumber));
+		badge.createSpan({ cls: "ln-pr-badge-trophy", text: "🏆" });
+		badge.createSpan({
+			cls: "ln-pr-badge-label",
+			text: kinds.map((k) => PR_LABEL[k]).join(" · "),
+		});
+		this.containerEl.insertAdjacentElement("afterend", badge);
+		this.containerEl.addClass("ln-set-pr");
+	}
+
+	clearPR(): void {
+		this.containerEl.removeClass("ln-set-pr");
+		const existing = this.containerEl.parentElement?.querySelector(
+			`.ln-pr-badge[data-row="${this.setNumber}"]`
+		);
+		existing?.remove();
 	}
 
 	destroy(): void {

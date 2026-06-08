@@ -7,6 +7,8 @@ import { ExercisePickerModal } from "../components/exercise-picker";
 import { ConfirmModal } from "../components/modals";
 import { TimerModal } from "./timer-view";
 import { findLastSetsForExercise } from "../utils/history";
+import { computeBests } from "../utils/sets";
+import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
 
 export const WORKOUT_VIEW_TYPE = "liftoff-workout";
 
@@ -78,6 +80,19 @@ export class WorkoutView extends ItemView {
 					intervals: te.targetSets,
 				};
 			}
+			if (exerciseType === "duration") {
+				return {
+					name: te.name,
+					exerciseType: "duration" as const,
+					sets: Array.from({ length: te.targetSets }, () => ({
+						weight: 0,
+						reps: 0,
+						unit: this.plugin.settings.weightUnit,
+						completed: false,
+						durationSeconds: 0,
+					})),
+				};
+			}
 			return {
 				name: te.name,
 				exerciseType: exerciseType,
@@ -139,6 +154,7 @@ export class WorkoutView extends ItemView {
 						exercise.sets[i]!.weight = prev.weight;
 						exercise.sets[i]!.reps = prev.reps;
 						exercise.sets[i]!.unit = prev.unit;
+						if (prev.setType) exercise.sets[i]!.setType = prev.setType;
 					}
 				}
 			}
@@ -216,12 +232,14 @@ export class WorkoutView extends ItemView {
 		for (let i = 0; i < this.workout.exercises.length; i++) {
 			const exercise = this.workout.exercises[i]!;
 			const lastData = findLastSetsForExercise(this.recentWorkouts, exercise.name);
+			const bests = computeBests(this.recentWorkouts, exercise.name);
 			const cardIndex = i;
 			const card = new ExerciseCard(
 				exercisesEl,
 				exercise,
 				lastData,
 				this.plugin.settings,
+				bests,
 				{
 					onExerciseChanged: () => {
 						void this.persistState();
@@ -346,16 +364,15 @@ export class WorkoutView extends ItemView {
 		if (!existing) {
 			this.plugin.settings.exerciseLibrary.push({ name, exerciseType });
 			void this.plugin.saveSettings();
-		} else if (!existing.exerciseType && exerciseType === "timer") {
+		} else if (!existing.exerciseType && exerciseType !== "weight") {
 			existing.exerciseType = exerciseType;
 			void this.plugin.saveSettings();
 		}
 
-		const isTimer = exerciseType === "timer";
 		const lastData = findLastSetsForExercise(this.recentWorkouts, name);
 
 		let newExercise: Exercise;
-		if (isTimer) {
+		if (exerciseType === "timer") {
 			newExercise = {
 				name,
 				exerciseType,
@@ -363,6 +380,19 @@ export class WorkoutView extends ItemView {
 				workSeconds: lastData?.workSeconds ?? this.plugin.settings.defaultWorkDuration,
 				restSeconds: lastData?.restSeconds ?? this.plugin.settings.defaultRestIntervalDuration,
 				intervals: lastData?.intervals ?? 5,
+			};
+		} else if (exerciseType === "duration") {
+			const seedCount = lastData?.sets.length || 1;
+			newExercise = {
+				name,
+				exerciseType,
+				sets: Array.from({ length: seedCount }, () => ({
+					weight: 0,
+					reps: 0,
+					unit: this.plugin.settings.weightUnit,
+					completed: false,
+					durationSeconds: 0,
+				})),
 			};
 		} else {
 			newExercise = {
@@ -414,9 +444,12 @@ export class WorkoutView extends ItemView {
 		}
 
 		try {
-			await this.plugin.workoutStore.saveWorkout(this.workout);
+			const summary = buildWorkoutSummary(this.workout, this.recentWorkouts);
+			const summaryMd = renderSummaryMarkdown(summary);
+			await this.plugin.workoutStore.saveWorkout(this.workout, summaryMd);
 			await this.plugin.clearActiveWorkout();
-			new Notice("Workout saved!");
+			const prCount = summary.prs.length;
+			new Notice(prCount > 0 ? `Workout saved! 🏆 ${prCount} PR${prCount === 1 ? "" : "s"}` : "Workout saved!");
 			void this.plugin.showHomeView();
 		} catch (e) {
 			new Notice(`Error saving workout: ${String(e)}`);

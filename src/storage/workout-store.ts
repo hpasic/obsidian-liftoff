@@ -1,7 +1,14 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
-import type { Workout, Exercise, WorkoutSet, LiftOffSettings } from "../types";
+import type { Workout, Exercise, WorkoutSet, SetType, LiftOffSettings } from "../types";
 import { workoutToFullMarkdown } from "../utils/frontmatter";
 import { generateWorkoutFilename } from "../utils/filename";
+
+const SET_TYPES: SetType[] = ["warmup", "working", "drop", "failure"];
+
+function parseSetType(value: unknown): SetType | undefined {
+	if (typeof value !== "string") return undefined;
+	return SET_TYPES.find((t) => t === value);
+}
 
 export interface RecentWorkout {
 	filename: string;
@@ -18,7 +25,7 @@ export class WorkoutStore {
 		private getSettings: () => LiftOffSettings
 	) {}
 
-	async saveWorkout(workout: Workout): Promise<TFile> {
+	async saveWorkout(workout: Workout, extraSections: string = ""): Promise<TFile> {
 		const settings = this.getSettings();
 		const folderPath = normalizePath(settings.workoutFolder);
 
@@ -28,7 +35,7 @@ export class WorkoutStore {
 		const filename = generateWorkoutFilename(workout.date, workout.template, existingFiles);
 		const filePath = normalizePath(`${folderPath}/${filename}`);
 
-		const content = workoutToFullMarkdown(workout);
+		const content = workoutToFullMarkdown(workout, extraSections);
 		return await this.app.vault.create(filePath, content);
 	}
 
@@ -75,31 +82,58 @@ export class WorkoutStore {
 		const exercises: Exercise[] = [];
 		if (Array.isArray(fm.exercises)) {
 			for (const ex of fm.exercises as Array<Record<string, unknown>>) {
-				const isTimer = ex.exerciseType === "timer";
-				if (isTimer) {
+				const note = typeof ex.note === "string" ? ex.note : undefined;
+				if (ex.exerciseType === "timer") {
 					exercises.push({
 						name: String(ex.name),
 						exerciseType: "timer",
 						sets: [],
+						note,
 						workSeconds: Number(ex.workSeconds) || 0,
 						restSeconds: Number(ex.restSeconds) || 0,
 						intervals: Number(ex.intervals) || 0,
+					});
+				} else if (ex.exerciseType === "duration") {
+					const sets: WorkoutSet[] = [];
+					if (Array.isArray(ex.sets)) {
+						for (const s of ex.sets as Array<Record<string, unknown>>) {
+							const set: WorkoutSet = {
+								weight: 0,
+								reps: 0,
+								unit: "kg",
+								completed: true,
+								durationSeconds: Number(s.durationSeconds) || 0,
+							};
+							const setType = parseSetType(s.setType);
+							if (setType) set.setType = setType;
+							sets.push(set);
+						}
+					}
+					exercises.push({
+						name: String(ex.name),
+						exerciseType: "duration",
+						sets,
+						note,
 					});
 				} else {
 					const sets: WorkoutSet[] = [];
 					if (Array.isArray(ex.sets)) {
 						for (const s of ex.sets as Array<Record<string, unknown>>) {
-							sets.push({
+							const set: WorkoutSet = {
 								weight: Number(s.weight) || 0,
 								reps: Number(s.reps) || 0,
 								unit: s.unit === "lbs" ? "lbs" : "kg",
 								completed: true,
-							});
+							};
+							const setType = parseSetType(s.setType);
+							if (setType) set.setType = setType;
+							sets.push(set);
 						}
 					}
 					exercises.push({
 						name: String(ex.name),
 						sets,
+						note,
 					});
 				}
 			}

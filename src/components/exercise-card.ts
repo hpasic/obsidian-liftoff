@@ -1,5 +1,7 @@
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
+import { applyToBests, detectPRs, type PRBests, type PRKind } from "../utils/sets";
+import { DurationSetRow } from "./duration-set-row";
 import { SetRow } from "./set-row";
 import { TimerBlock } from "./timer-block";
 
@@ -19,14 +21,20 @@ export class ExerciseCard {
 	private setRows: SetRowLike[] = [];
 	private timerBlock: TimerBlock | null = null;
 	private expanded: boolean;
+	private historyBests: PRBests;
+	private bests: PRBests;
+	private prKindsByIndex: Map<number, PRKind[]> = new Map();
 
 	constructor(
 		parentEl: HTMLElement,
 		private exercise: Exercise,
 		private lastData: LastExerciseData | null,
 		private settings: LiftOffSettings,
+		bests: PRBests,
 		private callbacks: ExerciseCardCallbacks
 	) {
+		this.historyBests = { ...bests };
+		this.bests = { ...bests };
 		this.expanded = true;
 		this.containerEl = parentEl.createDiv({ cls: "ln-exercise-card" });
 		this.setsContainerEl = null!;
@@ -37,7 +45,12 @@ export class ExerciseCard {
 		return this.exercise.exerciseType === "timer";
 	}
 
+	private get isDuration(): boolean {
+		return this.exercise.exerciseType === "duration";
+	}
+
 	private render(): void {
+		for (const row of this.setRows) row.destroy();
 		this.containerEl.empty();
 		this.setRows = [];
 		this.timerBlock = null;
@@ -61,6 +74,12 @@ export class ExerciseCard {
 			headerRight.createSpan({
 				cls: "ln-exercise-set-count",
 				text: `\u23F1 ${this.exercise.intervals ?? this.settings.defaultWorkDuration}`,
+			});
+		} else if (this.isDuration) {
+			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
+			headerRight.createSpan({
+				cls: "ln-exercise-set-count",
+				text: `\u23F1 ${completedCount}/${this.exercise.sets.length}`,
 			});
 		} else {
 			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
@@ -92,11 +111,92 @@ export class ExerciseCard {
 			return;
 		}
 
+		this.renderNoteField();
+
 		if (this.isTimer) {
 			this.renderTimer();
+		} else if (this.isDuration) {
+			this.renderDurationSets();
 		} else {
 			this.renderWeightSets();
 		}
+	}
+
+	private renderNoteField(): void {
+		const noteEl = this.containerEl.createEl("textarea", {
+			cls: "ln-exercise-note-input",
+			attr: { placeholder: "Add a note…", rows: "1" },
+		});
+		noteEl.value = this.exercise.note ?? "";
+		const autoGrow = () => {
+			noteEl.style.height = "auto";
+			noteEl.style.height = `${noteEl.scrollHeight}px`;
+		};
+		noteEl.addEventListener("input", () => {
+			this.exercise.note = noteEl.value;
+			autoGrow();
+			this.callbacks.onExerciseChanged(this.exercise);
+		});
+		autoGrow();
+	}
+
+	private renderDurationSets(): void {
+		// Previous hint (longest hold in last session)
+		let prevBest: number | null = null;
+		if (this.lastData && this.lastData.sets.length > 0) {
+			for (const s of this.lastData.sets) {
+				const d = s.durationSeconds ?? 0;
+				if (d > (prevBest ?? 0)) prevBest = d;
+			}
+		}
+
+		this.setsContainerEl = this.containerEl.createDiv({ cls: "ln-sets-container" });
+
+		for (let i = 0; i < this.exercise.sets.length; i++) {
+			const set = this.exercise.sets[i]!;
+			const previousSet = this.lastData?.sets[i];
+			const prev = previousSet?.durationSeconds ?? prevBest;
+
+			const row = new DurationSetRow(
+				this.setsContainerEl,
+				i + 1,
+				set,
+				prev ?? null,
+				{
+					onSetChanged: (updatedSet) => {
+						this.exercise.sets[i] = updatedSet;
+						this.callbacks.onExerciseChanged(this.exercise);
+					},
+					onSetCompleted: (updatedSet) => {
+						this.exercise.sets[i] = updatedSet;
+						this.callbacks.onExerciseChanged(this.exercise);
+						this.callbacks.onSetCompleted?.(updatedSet);
+					},
+					onSetRemoved: () => {
+						this.exercise.sets.splice(i, 1);
+						this.render();
+						this.callbacks.onExerciseChanged(this.exercise);
+					},
+				}
+			);
+			this.setRows.push(row);
+		}
+
+		const addSetBtn = this.containerEl.createDiv({
+			cls: "ln-add-set-btn",
+			text: "+ Add hold",
+		});
+		addSetBtn.addEventListener("click", () => {
+			this.exercise.sets.push({
+				weight: 0,
+				reps: 0,
+				unit: this.settings.weightUnit,
+				completed: false,
+				durationSeconds: 0,
+			});
+			this.render();
+			this.callbacks.onExerciseChanged(this.exercise);
+		});
 	}
 
 	private renderTimer(): void {
@@ -142,8 +242,6 @@ export class ExerciseCard {
 		colHeaders.createSpan({ cls: "ln-set-number", text: "SET" });
 		colHeaders.createSpan({ cls: "ln-set-input", text: this.settings.weightUnit.toUpperCase() });
 		colHeaders.createSpan({ cls: "ln-set-input", text: "REPS" });
-		colHeaders.createSpan({ cls: "ln-set-check", text: "" });
-		colHeaders.createSpan({ cls: "ln-set-remove", text: "" });
 
 		// Previous hint
 		if (this.lastData && this.lastData.sets.length > 0) {
@@ -202,17 +300,57 @@ export class ExerciseCard {
 						this.exercise.sets[i] = updatedSet;
 						this.callbacks.onExerciseChanged(this.exercise);
 						if (updatedSet.completed) {
+							const prs = detectPRs(updatedSet, this.bests);
+							if (prs.length > 0) {
+								this.prKindsByIndex.set(i, prs);
+								row.showPR(prs);
+								applyToBests(updatedSet, this.bests);
+							}
 							this.callbacks.onSetCompleted?.(updatedSet);
+						} else {
+							// Unchecked — clear any badge for this row and roll
+							// back the absorbed best so re-checking can PR again
+							this.prKindsByIndex.delete(i);
+							row.clearPR();
+							this.recomputeBests();
 						}
 					},
 					onSetRemoved: () => {
 						this.exercise.sets.splice(i, 1);
+						this.shiftPrKindsForRemoval(i);
 						this.render();
 						this.callbacks.onExerciseChanged(this.exercise);
 					},
 				}
 			);
 			this.setRows.push(row);
+
+			const existingPr = this.prKindsByIndex.get(i);
+			if (existingPr && existingPr.length > 0) {
+				row.showPR(existingPr);
+			}
+		}
+	}
+
+	private shiftPrKindsForRemoval(removedIndex: number): void {
+		const next: Map<number, PRKind[]> = new Map();
+		for (const [idx, kinds] of this.prKindsByIndex) {
+			if (idx < removedIndex) next.set(idx, kinds);
+			else if (idx > removedIndex) next.set(idx - 1, kinds);
+			// idx === removedIndex is dropped
+		}
+		this.prKindsByIndex = next;
+	}
+
+	/**
+	 * Rebuild live bests from the immutable history snapshot plus every set
+	 * still marked completed. Called when a set is unchecked so its absorbed
+	 * best is rolled back and re-checking it can register the PR again.
+	 */
+	private recomputeBests(): void {
+		this.bests = { ...this.historyBests };
+		for (const set of this.exercise.sets) {
+			if (set.completed) applyToBests(set, this.bests);
 		}
 	}
 
@@ -261,6 +399,7 @@ export class ExerciseCard {
 
 	destroy(): void {
 		this.timerBlock?.destroy();
+		for (const row of this.setRows) row.destroy();
 		this.containerEl.remove();
 	}
 }

@@ -350,6 +350,33 @@
 	margin-top: 4px;
 }
 
+.ln-exercise-note-input {
+	width: 100%;
+	box-sizing: border-box;
+	margin: 8px 0 12px;
+	padding: 8px 10px;
+	border: none;
+	border-radius: 8px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 13px;
+	font-family: inherit;
+	line-height: 1.4;
+	resize: none;
+	overflow: hidden;
+	min-height: 36px;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.ln-exercise-note-input::placeholder {
+	color: var(--text-faint);
+}
+
+.ln-exercise-note-input:focus {
+	outline: 2px solid var(--interactive-accent);
+}
+
 .ln-exercise-previous {
 	font-size: 11px;
 	color: var(--text-faint);
@@ -360,7 +387,7 @@
 /* --- Set Row --- */
 .ln-set-row {
 	display: grid;
-	grid-template-columns: 28px 90px 90px 44px 44px;
+	grid-template-columns: 40px 1fr 1fr 44px 44px;
 	gap: 8px;
 	align-items: center;
 	justify-content: center;
@@ -397,10 +424,52 @@
 	color: var(--text-faint);
 }
 
+/* Header labels are plain text, not input-styled boxes */
+.ln-exercise-card .ln-set-row.ln-set-header .ln-set-input {
+	background: transparent;
+	border: none;
+	min-height: auto;
+	padding: 0;
+}
+
 .ln-set-number {
 	font-size: 13px;
+	font-weight: 600;
 	text-align: center;
 	color: var(--text-faint);
+	min-height: 44px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	border-radius: 6px;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.ln-set-row.ln-set-header .ln-set-number,
+.ln-set-header span.ln-set-number {
+	min-height: auto;
+	font-weight: normal;
+}
+
+.ln-set-number.ln-set-type-warmup {
+	color: var(--color-yellow);
+	background: rgba(var(--color-yellow-rgb, 224, 172, 0), 0.12);
+}
+
+.ln-set-number.ln-set-type-drop {
+	color: var(--color-purple, var(--interactive-accent));
+	background: rgba(var(--color-purple-rgb, 175, 122, 197), 0.12);
+}
+
+.ln-set-number.ln-set-type-failure {
+	color: var(--text-error);
+	background: rgba(var(--color-red-rgb, 230, 80, 80), 0.12);
+}
+
+.ln-set-number:active {
+	opacity: 0.6;
 }
 
 .ln-exercise-card .ln-set-input {
@@ -452,6 +521,101 @@
 
 .ln-set-row.ln-set-completed .ln-set-input {
 	opacity: 0.6;
+}
+
+/* --- Duration Set Row --- */
+.ln-duration-row {
+	display: grid;
+	grid-template-columns: 40px 1fr 90px 44px;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.ln-duration-middle {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.ln-duration-display {
+	font-size: 24px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 1px;
+	color: var(--text-normal);
+}
+
+.ln-duration-previous {
+	font-size: 10px;
+	color: var(--text-faint);
+	margin-top: 2px;
+}
+
+.ln-duration-action {
+	min-height: 44px;
+	padding: 10px 14px;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	background: var(--background-primary);
+	color: var(--text-normal);
+}
+
+.ln-duration-action.ln-duration-start {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.ln-duration-action.ln-duration-stop {
+	background: var(--color-red, var(--text-error));
+	color: white;
+}
+
+.ln-duration-action:active {
+	opacity: 0.8;
+}
+
+.ln-duration-row.ln-set-completed .ln-duration-display {
+	color: var(--color-green);
+}
+
+.ln-pr-badge {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: -4px 0 6px;
+	padding: 6px 10px;
+	border-radius: 8px;
+	background: linear-gradient(
+		90deg,
+		rgba(var(--color-yellow-rgb, 224, 172, 0), 0.18),
+		rgba(var(--interactive-accent-rgb, 66, 135, 245), 0.12)
+	);
+	color: var(--text-normal);
+	font-size: 12px;
+	font-weight: 600;
+	animation: ln-pr-pop 280ms ease-out;
+}
+
+.ln-pr-badge-trophy {
+	font-size: 14px;
+}
+
+.ln-pr-badge-label {
+	letter-spacing: 0.3px;
+}
+
+.ln-set-row.ln-set-pr {
+	transition: background 200ms ease;
+}
+
+@keyframes ln-pr-pop {
+	0% { transform: scale(0.92); opacity: 0; }
+	60% { transform: scale(1.04); opacity: 1; }
+	100% { transform: scale(1); opacity: 1; }
 }
 
 .ln-add-set-btn {
@@ -638,7 +802,8 @@
 	opacity: 0.8;
 }
 
-.ln-exercise-create-timer {
+.ln-exercise-create-timer,
+.ln-exercise-create-duration {
 	color: var(--text-muted);
 }
 
