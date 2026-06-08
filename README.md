@@ -41,13 +41,19 @@ Bests update mid-workout, so back-to-back PRs both light up.
 
 Every saved workout gets a `## Summary` section with total duration, working-set count, total volume, and the PRs you hit — a clean, readable record right in the note.
 
-### Timers
+![Workout summary](screenshots/summary.png)
 
-A built-in rest timer with preset durations, an interval timer for HIIT-style work/rest sets, and count-up duration holds for static exercises like planks.
+### Timers and holds
+
+A built-in rest timer with preset durations, an interval timer for HIIT-style work/rest sets, and count-up duration holds for static exercises like planks, dead hangs, and L-sits.
 
 <p align="center">
   <img src="screenshots/rest-timer.png" width="400" alt="Rest timer with preset durations" />
   <img src="screenshots/interval-timer-running.png" width="400" alt="Interval timer during work phase" />
+</p>
+
+<p align="center">
+  <img src="screenshots/duration-hold.png" width="300" alt="Count-up stopwatch for a max-hold exercise" />
 </p>
 
 ### Settings
