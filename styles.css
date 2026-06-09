@@ -365,6 +365,7 @@
 	resize: none;
 	overflow: hidden;
 	min-height: 36px;
+	height: var(--ln-note-height, 36px);
 	-webkit-appearance: none;
 	appearance: none;
 }

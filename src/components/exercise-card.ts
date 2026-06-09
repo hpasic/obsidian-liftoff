@@ -129,8 +129,11 @@ export class ExerciseCard {
 		});
 		noteEl.value = this.exercise.note ?? "";
 		const autoGrow = () => {
-			noteEl.style.height = "auto";
-			noteEl.style.height = `${noteEl.scrollHeight}px`;
+			// Drive height via a CSS var the stylesheet consumes (Obsidian forbids
+			// direct el.style assignment). Set to auto first so scrollHeight reflows
+			// to the content height, then pin to it.
+			noteEl.setCssProps({ "--ln-note-height": "auto" });
+			noteEl.setCssProps({ "--ln-note-height": `${noteEl.scrollHeight}px` });
 		};
 		noteEl.addEventListener("input", () => {
 			this.exercise.note = noteEl.value;
