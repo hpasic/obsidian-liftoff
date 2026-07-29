@@ -316,6 +316,12 @@
 	padding: 16px;
 }
 
+/* Collapse hides content instead of unmounting it, so running timers
+   and in-progress holds survive an (accidental) header tap */
+.ln-exercise-card.ln-exercise-collapsed > *:not(.ln-exercise-header):not(.ln-exercise-notes) {
+	display: none;
+}
+
 .ln-exercise-header {
 	display: flex;
 	justify-content: space-between;

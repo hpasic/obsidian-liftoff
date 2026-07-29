@@ -102,6 +102,14 @@ describe("timer exercise frontmatter", () => {
 		expect(result).toContain("transitionSeconds: 5");
 		expect(result).toContain("intervals: 5");
 	});
+
+	it("omits a negative transitionSeconds", () => {
+		const w: Workout = {
+			...timerWorkout,
+			exercises: [{ ...timerWorkout.exercises[0]!, transitionSeconds: -5 }],
+		};
+		expect(workoutToFrontmatter(w)).not.toContain("transitionSeconds");
+	});
 });
 
 describe("timer exercise markdown body", () => {
@@ -112,6 +120,16 @@ describe("timer exercise markdown body", () => {
 		expect(result).toContain("0:40");
 		expect(result).toContain("0:20");
 		expect(result).not.toContain("Weight");
+		expect(result).not.toContain("switch");
+	});
+
+	it("includes switch time in the interval summary when set", () => {
+		const w: Workout = {
+			...timerWorkout,
+			exercises: [{ ...timerWorkout.exercises[0]!, transitionSeconds: 10 }],
+		};
+		const result = workoutToMarkdownBody(w);
+		expect(result).toContain("0:40 work / 0:20 rest / 0:10 switch");
 	});
 });
 

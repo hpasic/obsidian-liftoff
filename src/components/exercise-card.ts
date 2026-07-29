@@ -78,7 +78,7 @@ export class ExerciseCard {
 		if (this.isTimer) {
 			headerRight.createSpan({
 				cls: "ln-exercise-set-count",
-				text: `\u23F1 ${this.exercise.intervals ?? this.settings.defaultWorkDuration}`,
+				text: `\u23F1 ${this.exercise.intervals ?? 5}`,
 			});
 		} else if (this.isDuration) {
 			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
@@ -107,16 +107,13 @@ export class ExerciseCard {
 			});
 		}
 
-		// Toggle expand/collapse on header tap
+		// Toggle expand/collapse on header tap. Visibility-only (CSS class):
+		// re-rendering here would destroy a running timer or in-progress hold.
 		header.addEventListener("click", () => {
-			this.expanded = !this.expanded;
-			this.render();
+			this.setExpanded(!this.expanded);
 		});
 
-		if (!this.expanded) {
-			this.containerEl.addClass("ln-exercise-collapsed");
-			return;
-		}
+		this.containerEl.toggleClass("ln-exercise-collapsed", !this.expanded);
 
 		this.renderNoteField();
 
@@ -247,10 +244,11 @@ export class ExerciseCard {
 		if (this.lastData && this.lastData.workSeconds !== undefined) {
 			const w = this.formatTime(this.lastData.workSeconds);
 			const r = this.formatTime(this.lastData.restSeconds ?? 0);
+			const t = this.lastData.transitionSeconds ?? 0;
 			const n = this.lastData.intervals ?? 0;
 			this.containerEl.createDiv({
 				cls: "ln-exercise-previous",
-				text: `Previous: ${w} / ${r} \u00D7 ${n}`,
+				text: `Previous: ${w} / ${r}${t > 0 ? ` / ${this.formatTime(t)}` : ""} \u00D7 ${n}`,
 			});
 		}
 
@@ -431,13 +429,16 @@ export class ExerciseCard {
 	}
 
 	expand(): void {
-		this.expanded = true;
-		this.render();
+		this.setExpanded(true);
 	}
 
 	collapse(): void {
-		this.expanded = false;
-		this.render();
+		this.setExpanded(false);
+	}
+
+	private setExpanded(expanded: boolean): void {
+		this.expanded = expanded;
+		this.containerEl.toggleClass("ln-exercise-collapsed", !expanded);
 	}
 
 	getRootEl(): HTMLElement {

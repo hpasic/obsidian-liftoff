@@ -255,6 +255,8 @@ export class HomeView extends ItemView {
 			[],
 			(updated) => {
 				void (async () => {
+					// Template first: a failed template write must not grow the library
+					await this.plugin.templateStore.saveTemplate(updated);
 					const library = this.plugin.settings.exerciseLibrary;
 					for (const ex of updated.exercises) {
 						const existing = library.find(
@@ -267,7 +269,6 @@ export class HomeView extends ItemView {
 						}
 					}
 					await this.plugin.saveSettings();
-					await this.plugin.templateStore.saveTemplate(updated);
 					new Notice(`Template "${updated.name}" saved.`);
 					await this.renderHome();
 				})();

@@ -196,6 +196,9 @@ export class WorkoutView extends ItemView {
 
 	private renderWorkout(): void {
 		const container = this.containerEl.children[1] as HTMLElement;
+		// Destroy outgoing cards — container.empty() only detaches DOM; timer and
+		// duration-row intervals would keep running and mutating shared exercises
+		for (const card of this.exerciseCards) card.destroy();
 		container.empty();
 		container.addClass("ln-workout-view");
 		this.exerciseCards = [];
@@ -380,7 +383,9 @@ export class WorkoutView extends ItemView {
 	}
 
 	private addExercise(name: string, exerciseType: ExerciseType): void {
-		const existing = this.plugin.settings.exerciseLibrary.find((e) => e.name === name);
+		const existing = this.plugin.settings.exerciseLibrary.find(
+			(e) => e.name.toLowerCase() === name.toLowerCase()
+		);
 		if (!existing) {
 			this.plugin.settings.exerciseLibrary.push({ name, exerciseType });
 			void this.plugin.saveSettings();
@@ -499,9 +504,10 @@ export class WorkoutView extends ItemView {
 		if (!confirmed) return;
 
 		// Copy rather than mutate: cards hold live references to these exercises,
-		// so trimming in place would wipe the open workout if the save fails
-		const completedExercises = this.collectWorkout()
-			.exercises.filter((e) => e.sets.some((s) => s.completed))
+		// and the live workout must survive a failed save untouched
+		const collected = this.collectWorkout();
+		const completedExercises = collected.exercises
+			.filter((e) => e.sets.some((s) => s.completed))
 			.map((e) => ({ ...e, sets: e.sets.filter((s) => s.completed) }));
 
 		if (completedExercises.length === 0) {
@@ -509,16 +515,18 @@ export class WorkoutView extends ItemView {
 			return;
 		}
 
-		this.workout.exercises = completedExercises;
-
 		const now = new Date();
-		this.workout.end = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-		this.workout.duration = Math.round((now.getTime() - this.startTime.getTime()) / 60000);
+		const finished: Workout = {
+			...collected,
+			end: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+			duration: Math.round((now.getTime() - this.startTime.getTime()) / 60000),
+			exercises: completedExercises,
+		};
 
 		try {
-			const summary = buildWorkoutSummary(this.workout, this.recentWorkouts);
+			const summary = buildWorkoutSummary(finished, this.recentWorkouts);
 			const summaryMd = renderSummaryMarkdown(summary);
-			await this.plugin.workoutStore.saveWorkout(this.workout, summaryMd);
+			await this.plugin.workoutStore.saveWorkout(finished, summaryMd);
 			await this.plugin.clearActiveWorkout();
 			const prCount = summary.prs.length;
 			new Notice(prCount > 0 ? `Workout saved! 🏆 ${prCount} PR${prCount === 1 ? "" : "s"}` : "Workout saved!");
@@ -533,6 +541,8 @@ export class WorkoutView extends ItemView {
 			window.clearInterval(this.timerIntervalId);
 		}
 		this.stopRestTimer();
+		for (const card of this.exerciseCards) card.destroy();
+		this.exerciseCards = [];
 		return Promise.resolve();
 	}
 }
