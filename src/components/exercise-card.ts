@@ -1,3 +1,4 @@
+import { Menu } from "obsidian";
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
 import { applyToBests, detectPRs, type PRBests, type PRKind } from "../utils/sets";
@@ -8,10 +9,13 @@ import { TimerBlock } from "./timer-block";
 export interface ExerciseCardCallbacks {
 	onExerciseChanged: (exercise: Exercise) => void;
 	onSetCompleted?: (set: WorkoutSet) => void;
+	// Omitted by the owner when the move is impossible (first/last exercise)
+	onMoveUp?: () => void;
+	onMoveDown?: () => void;
+	onRemove?: () => void;
 }
 
 interface SetRowLike {
-	getSet(): WorkoutSet;
 	destroy(): void;
 }
 
@@ -51,6 +55,7 @@ export class ExerciseCard {
 
 	private render(): void {
 		for (const row of this.setRows) row.destroy();
+		this.timerBlock?.destroy();
 		this.containerEl.empty();
 		this.setRows = [];
 		this.timerBlock = null;
@@ -89,6 +94,8 @@ export class ExerciseCard {
 			});
 		}
 
+		this.renderMenuButton(headerRight);
+
 		// Exercise notes
 		const libraryEntry = this.settings.exerciseLibrary.find(
 			(e) => e.name.toLowerCase() === this.exercise.name.toLowerCase()
@@ -120,6 +127,39 @@ export class ExerciseCard {
 		} else {
 			this.renderWeightSets();
 		}
+	}
+
+	private renderMenuButton(parentEl: HTMLElement): void {
+		const { onMoveUp, onMoveDown, onRemove } = this.callbacks;
+		if (!onMoveUp && !onMoveDown && !onRemove) return;
+
+		const menuBtn = parentEl.createEl("button", {
+			cls: "ln-exercise-menu-btn",
+			text: "\u22EE",
+			attr: { "aria-label": "Exercise options" },
+		});
+		menuBtn.addEventListener("click", (evt) => {
+			// Header click toggles collapse — keep it off the menu button
+			evt.stopPropagation();
+
+			const menu = new Menu();
+			if (onMoveUp) {
+				menu.addItem((item) =>
+					item.setTitle("Move up").setIcon("arrow-up").onClick(() => onMoveUp())
+				);
+			}
+			if (onMoveDown) {
+				menu.addItem((item) =>
+					item.setTitle("Move down").setIcon("arrow-down").onClick(() => onMoveDown())
+				);
+			}
+			if (onRemove) {
+				menu.addItem((item) =>
+					item.setTitle("Remove exercise").setIcon("trash-2").onClick(() => onRemove())
+				);
+			}
+			menu.showAtMouseEvent(evt);
+		});
 	}
 
 	private renderNoteField(): void {
@@ -218,6 +258,15 @@ export class ExerciseCard {
 		const restSec = this.exercise.restSeconds ?? this.settings.defaultRestIntervalDuration;
 		const intervals = this.exercise.intervals ?? 5;
 
+		// Resolved defaults are the exercise's state from now on — getExercise()
+		// reads them straight off the exercise, not off the timer block
+		this.exercise.workSeconds = workSec;
+		this.exercise.restSeconds = restSec;
+		this.exercise.intervals = intervals;
+
+		const wasCompleted =
+			this.exercise.sets.length > 0 && this.exercise.sets.every((s) => s.completed);
+
 		this.timerBlock = new TimerBlock(
 			this.containerEl,
 			workSec,
@@ -225,6 +274,11 @@ export class ExerciseCard {
 			intervals,
 			{
 				onCompleted: () => {
+					const count = this.timerBlock?.getState().intervals ?? intervals;
+					this.exercise.sets = Array.from({ length: count }, () => ({
+						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
+					}));
+					this.callbacks.onExerciseChanged(this.exercise);
 					this.callbacks.onSetCompleted?.({
 						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
 					});
@@ -235,7 +289,12 @@ export class ExerciseCard {
 					this.exercise.intervals = n;
 					this.callbacks.onExerciseChanged(this.exercise);
 				},
-			}
+				onReset: () => {
+					this.exercise.sets = [];
+					this.callbacks.onExerciseChanged(this.exercise);
+				},
+			},
+			wasCompleted
 		);
 	}
 
@@ -363,6 +422,10 @@ export class ExerciseCard {
 		return `${m}:${String(s).padStart(2, "0")}`;
 	}
 
+	isExpanded(): boolean {
+		return this.expanded;
+	}
+
 	expand(): void {
 		this.expanded = true;
 		this.render();
@@ -377,27 +440,13 @@ export class ExerciseCard {
 		return this.containerEl;
 	}
 
+	/**
+	 * The exercise object is the single source of truth: set rows and the timer
+	 * block write straight into it, so a collapsed card (which renders no rows)
+	 * still reports its real sets.
+	 */
 	getExercise(): Exercise {
-		if (this.isTimer && this.timerBlock) {
-			const state = this.timerBlock.getState();
-			return {
-				name: this.exercise.name,
-				exerciseType: "timer",
-				workSeconds: state.workSeconds,
-				restSeconds: state.restSeconds,
-				intervals: state.intervals,
-				sets: state.completed
-					? Array.from({ length: state.intervals }, () => ({
-						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
-					}))
-					: [],
-			};
-		}
-		return {
-			name: this.exercise.name,
-			exerciseType: this.exercise.exerciseType,
-			sets: this.setRows.map((r) => r.getSet()),
-		};
+		return this.exercise;
 	}
 
 	destroy(): void {

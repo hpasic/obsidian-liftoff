@@ -1,6 +1,7 @@
 export interface TimerBlockCallbacks {
 	onCompleted: () => void;
 	onChanged: (workSeconds: number, restSeconds: number, intervals: number) => void;
+	onReset?: () => void;
 }
 
 type TimerPhase = "idle" | "running" | "paused" | "completed";
@@ -24,11 +25,16 @@ export class TimerBlock {
 		workSeconds: number,
 		restSeconds: number,
 		intervals: number,
-		private callbacks: TimerBlockCallbacks
+		private callbacks: TimerBlockCallbacks,
+		initialCompleted: boolean = false
 	) {
 		this.workSeconds = workSeconds;
 		this.restSeconds = restSeconds;
 		this.intervals = intervals;
+		if (initialCompleted) {
+			this.completed = true;
+			this.phase = "completed";
+		}
 		this.containerEl = parentEl.createDiv({ cls: "ln-timer-block" });
 		this.render();
 	}
@@ -198,6 +204,7 @@ export class TimerBlock {
 		this.currentInterval = 1;
 		this.runPhase = "work";
 		this.render();
+		this.callbacks.onReset?.();
 	}
 
 	private tick(): void {
