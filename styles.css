@@ -343,6 +343,26 @@
 	color: var(--text-faint);
 }
 
+.ln-exercise-menu-btn {
+	/* Negative margin keeps the touch target big without padding out the header */
+	margin: -8px -6px;
+	padding: 8px 6px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-faint);
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.ln-exercise-menu-btn:hover,
+.ln-exercise-menu-btn:active {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
 .ln-exercise-notes {
 	font-size: 11px;
 	color: var(--text-muted);
