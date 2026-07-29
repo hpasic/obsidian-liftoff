@@ -49,7 +49,7 @@ export class TemplateEditorModal extends Modal {
 					this.template.exercises.push({
 						name,
 						targetSets: 3,
-						exerciseType: exerciseType === "timer" ? "timer" : undefined,
+						exerciseType: exerciseType === "weight" ? undefined : exerciseType,
 					});
 					this.renderExercises();
 				}
@@ -80,9 +80,14 @@ export class TemplateEditorModal extends Modal {
 		for (let i = 0; i < this.template.exercises.length; i++) {
 			const ex = this.template.exercises[i]!;
 			const isTimer = ex.exerciseType === "timer";
+			const isDuration = ex.exerciseType === "duration";
+			const countLabel = isTimer ? "intervals" : isDuration ? "holds" : "sets";
 			const row = this.listEl.createDiv({ cls: "ln-te-exercise-row" });
 
-			const nameText = isTimer ? `\u23F1 ${ex.name}` : ex.name;
+			let nameText: string;
+			if (isTimer) nameText = `\u23F1 ${ex.name}`;
+			else if (isDuration) nameText = `\u23F2 ${ex.name}`;
+			else nameText = ex.name;
 			row.createSpan({ cls: "ln-te-exercise-name", text: nameText });
 
 			const controls = row.createDiv({ cls: "ln-te-exercise-controls" });
@@ -93,7 +98,7 @@ export class TemplateEditorModal extends Modal {
 			});
 			const setsLabel = controls.createSpan({
 				cls: "ln-te-sets-label",
-				text: `${ex.targetSets} ${isTimer ? "intervals" : "sets"}`,
+				text: `${ex.targetSets} ${countLabel}`,
 			});
 			const plusBtn = controls.createEl("button", {
 				cls: "ln-te-sets-btn",
@@ -103,13 +108,13 @@ export class TemplateEditorModal extends Modal {
 			minusBtn.addEventListener("click", () => {
 				if (ex.targetSets > 1) {
 					ex.targetSets--;
-					setsLabel.textContent = `${ex.targetSets} ${isTimer ? "intervals" : "sets"}`;
+					setsLabel.textContent = `${ex.targetSets} ${countLabel}`;
 				}
 			});
 			plusBtn.addEventListener("click", () => {
 				if (ex.targetSets < 20) {
 					ex.targetSets++;
-					setsLabel.textContent = `${ex.targetSets} ${isTimer ? "intervals" : "sets"}`;
+					setsLabel.textContent = `${ex.targetSets} ${countLabel}`;
 				}
 			});
 
