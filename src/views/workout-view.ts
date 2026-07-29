@@ -2,11 +2,12 @@ import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type LiftOffPlugin from "../main";
 import type { ActiveWorkout, Workout, Exercise, ExerciseType } from "../types";
 import type { WorkoutTemplate } from "../types";
-import { ExerciseCard } from "../components/exercise-card";
+import { ExerciseCard, type ExerciseCardCallbacks } from "../components/exercise-card";
 import { ExercisePickerModal } from "../components/exercise-picker";
 import { ConfirmModal } from "../components/modals";
 import { TimerModal } from "./timer-view";
 import { findLastSetsForExercise } from "../utils/history";
+import { remapIndexAfterRemoval, remapIndexAfterSwap } from "../utils/reorder";
 import { computeBests } from "../utils/sets";
 import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
 
@@ -24,6 +25,8 @@ export class WorkoutView extends ItemView {
 	private activeRestExerciseIndex: number | null = null;
 	private recentWorkouts: Workout[] = [];
 	private initialized = false;
+	/** Collapsed/expanded state to restore on the next renderWorkout(), by exercise index. */
+	private pendingExpanded: boolean[] | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LiftOffPlugin) {
 		super(leaf);
@@ -146,6 +149,7 @@ export class WorkoutView extends ItemView {
 			if (exercise.exerciseType === "timer") {
 				if (lastData.workSeconds !== undefined) exercise.workSeconds = lastData.workSeconds;
 				if (lastData.restSeconds !== undefined) exercise.restSeconds = lastData.restSeconds;
+				if (lastData.transitionSeconds !== undefined) exercise.transitionSeconds = lastData.transitionSeconds;
 				if (lastData.intervals !== undefined) exercise.intervals = lastData.intervals;
 			} else {
 				for (let i = 0; i < exercise.sets.length; i++) {
@@ -192,9 +196,14 @@ export class WorkoutView extends ItemView {
 
 	private renderWorkout(): void {
 		const container = this.containerEl.children[1] as HTMLElement;
+		// Destroy outgoing cards — container.empty() only detaches DOM; timer and
+		// duration-row intervals would keep running and mutating shared exercises
+		for (const card of this.exerciseCards) card.destroy();
 		container.empty();
 		container.addClass("ln-workout-view");
 		this.exerciseCards = [];
+		const expandedToRestore = this.pendingExpanded;
+		this.pendingExpanded = null;
 
 		// Header
 		const header = container.createDiv({ cls: "ln-workout-header" });
@@ -234,27 +243,41 @@ export class WorkoutView extends ItemView {
 			const lastData = findLastSetsForExercise(this.recentWorkouts, exercise.name);
 			const bests = computeBests(this.recentWorkouts, exercise.name);
 			const cardIndex = i;
+			const callbacks: ExerciseCardCallbacks = {
+				onExerciseChanged: () => {
+					void this.persistState();
+				},
+				onSetCompleted: () => {
+					this.startRestTimerAt(cardIndex);
+					void this.persistState();
+				},
+				onRemove: () => {
+					void this.removeExercise(cardIndex);
+				},
+			};
+			if (i > 0) {
+				callbacks.onMoveUp = () => this.moveExercise(cardIndex, cardIndex - 1);
+			}
+			if (i < this.workout.exercises.length - 1) {
+				callbacks.onMoveDown = () => this.moveExercise(cardIndex, cardIndex + 1);
+			}
+
 			const card = new ExerciseCard(
 				exercisesEl,
 				exercise,
 				lastData,
 				this.plugin.settings,
 				bests,
-				{
-					onExerciseChanged: () => {
-						void this.persistState();
-					},
-					onSetCompleted: () => {
-						this.startRestTimerAt(cardIndex);
-						void this.persistState();
-					},
-				}
+				callbacks
 			);
+			if (expandedToRestore?.[i] === false) card.collapse();
 			this.exerciseCards.push(card);
 		}
 
 		// If a rest timer was active before re-render, re-mount it under the same card
+		// (the element above is rebuilt hidden on every render)
 		if (this.activeRestExerciseIndex !== null && this.restTimerIntervalId !== null) {
+			this.restTimerEl.removeClass("ln-rest-timer-hidden");
 			this.mountRestTimerAt(this.activeRestExerciseIndex);
 		}
 
@@ -360,7 +383,9 @@ export class WorkoutView extends ItemView {
 	}
 
 	private addExercise(name: string, exerciseType: ExerciseType): void {
-		const existing = this.plugin.settings.exerciseLibrary.find((e) => e.name === name);
+		const existing = this.plugin.settings.exerciseLibrary.find(
+			(e) => e.name.toLowerCase() === name.toLowerCase()
+		);
 		if (!existing) {
 			this.plugin.settings.exerciseLibrary.push({ name, exerciseType });
 			void this.plugin.saveSettings();
@@ -379,6 +404,7 @@ export class WorkoutView extends ItemView {
 				sets: [],
 				workSeconds: lastData?.workSeconds ?? this.plugin.settings.defaultWorkDuration,
 				restSeconds: lastData?.restSeconds ?? this.plugin.settings.defaultRestIntervalDuration,
+				transitionSeconds: lastData?.transitionSeconds ?? 0,
 				intervals: lastData?.intervals ?? 5,
 			};
 		} else if (exerciseType === "duration") {
@@ -415,7 +441,60 @@ export class WorkoutView extends ItemView {
 			}
 		}
 
+		const expanded = this.captureExpanded();
 		this.workout.exercises.push(newExercise);
+		expanded.push(true);
+		this.pendingExpanded = expanded;
+		this.renderWorkout();
+		void this.persistState();
+	}
+
+	private captureExpanded(): boolean[] {
+		return this.exerciseCards.map((c) => c.isExpanded());
+	}
+
+	private moveExercise(from: number, to: number): void {
+		const exercises = this.collectWorkout().exercises;
+		if (from < 0 || to < 0 || from >= exercises.length || to >= exercises.length) return;
+
+		const expanded = this.captureExpanded();
+		[exercises[from], exercises[to]] = [exercises[to]!, exercises[from]!];
+		[expanded[from], expanded[to]] = [expanded[to]!, expanded[from]!];
+
+		this.workout.exercises = exercises;
+		this.pendingExpanded = expanded;
+		this.activeRestExerciseIndex = remapIndexAfterSwap(this.activeRestExerciseIndex, from, to);
+
+		this.renderWorkout();
+		void this.persistState();
+	}
+
+	private async removeExercise(index: number): Promise<void> {
+		const exercise = this.workout.exercises[index];
+		if (!exercise) return;
+
+		if (exercise.sets.some((s) => s.completed)) {
+			const confirmed = await new ConfirmModal(
+				this.app,
+				`Remove "${exercise.name}" from this workout?`
+			).openAndWait();
+			if (!confirmed) return;
+		}
+
+		const exercises = this.collectWorkout().exercises;
+		const expanded = this.captureExpanded();
+		exercises.splice(index, 1);
+		expanded.splice(index, 1);
+
+		this.workout.exercises = exercises;
+		this.pendingExpanded = expanded;
+
+		if (this.activeRestExerciseIndex !== null) {
+			const nextRestIndex = remapIndexAfterRemoval(this.activeRestExerciseIndex, index);
+			if (nextRestIndex === null) this.stopRestTimer();
+			else this.activeRestExerciseIndex = nextRestIndex;
+		}
+
 		this.renderWorkout();
 		void this.persistState();
 	}
@@ -424,29 +503,30 @@ export class WorkoutView extends ItemView {
 		const confirmed = await new ConfirmModal(this.app, "Finish and save this workout?").openAndWait();
 		if (!confirmed) return;
 
-		this.workout.exercises = this.exerciseCards.map((c) => c.getExercise());
+		// Copy rather than mutate: cards hold live references to these exercises,
+		// and the live workout must survive a failed save untouched
+		const collected = this.collectWorkout();
+		const completedExercises = collected.exercises
+			.filter((e) => e.sets.some((s) => s.completed))
+			.map((e) => ({ ...e, sets: e.sets.filter((s) => s.completed) }));
 
-		this.workout.exercises = this.workout.exercises.filter(
-			(e) => e.sets.some((s) => s.completed)
-		);
-
-		if (this.workout.exercises.length === 0) {
+		if (completedExercises.length === 0) {
 			new Notice("No completed sets to save.");
 			return;
 		}
 
 		const now = new Date();
-		this.workout.end = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-		this.workout.duration = Math.round((now.getTime() - this.startTime.getTime()) / 60000);
-
-		for (const exercise of this.workout.exercises) {
-			exercise.sets = exercise.sets.filter((s) => s.completed);
-		}
+		const finished: Workout = {
+			...collected,
+			end: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+			duration: Math.round((now.getTime() - this.startTime.getTime()) / 60000),
+			exercises: completedExercises,
+		};
 
 		try {
-			const summary = buildWorkoutSummary(this.workout, this.recentWorkouts);
+			const summary = buildWorkoutSummary(finished, this.recentWorkouts);
 			const summaryMd = renderSummaryMarkdown(summary);
-			await this.plugin.workoutStore.saveWorkout(this.workout, summaryMd);
+			await this.plugin.workoutStore.saveWorkout(finished, summaryMd);
 			await this.plugin.clearActiveWorkout();
 			const prCount = summary.prs.length;
 			new Notice(prCount > 0 ? `Workout saved! 🏆 ${prCount} PR${prCount === 1 ? "" : "s"}` : "Workout saved!");
@@ -461,6 +541,8 @@ export class WorkoutView extends ItemView {
 			window.clearInterval(this.timerIntervalId);
 		}
 		this.stopRestTimer();
+		for (const card of this.exerciseCards) card.destroy();
+		this.exerciseCards = [];
 		return Promise.resolve();
 	}
 }

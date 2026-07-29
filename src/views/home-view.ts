@@ -255,7 +255,20 @@ export class HomeView extends ItemView {
 			[],
 			(updated) => {
 				void (async () => {
+					// Template first: a failed template write must not grow the library
 					await this.plugin.templateStore.saveTemplate(updated);
+					const library = this.plugin.settings.exerciseLibrary;
+					for (const ex of updated.exercises) {
+						const existing = library.find(
+							(e) => e.name.toLowerCase() === ex.name.toLowerCase()
+						);
+						if (!existing) {
+							library.push({ name: ex.name, exerciseType: ex.exerciseType });
+						} else if (!existing.exerciseType && ex.exerciseType) {
+							existing.exerciseType = ex.exerciseType;
+						}
+					}
+					await this.plugin.saveSettings();
 					new Notice(`Template "${updated.name}" saved.`);
 					await this.renderHome();
 				})();

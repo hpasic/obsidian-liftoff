@@ -43,6 +43,9 @@ export function workoutToFrontmatter(workout: Workout): string {
 			lines.push(`    exerciseType: timer`);
 			lines.push(`    workSeconds: ${exercise.workSeconds ?? 0}`);
 			lines.push(`    restSeconds: ${exercise.restSeconds ?? 0}`);
+			if ((exercise.transitionSeconds ?? 0) > 0) {
+				lines.push(`    transitionSeconds: ${exercise.transitionSeconds}`);
+			}
 			lines.push(`    intervals: ${exercise.intervals ?? 0}`);
 		} else if (exercise.exerciseType === "duration") {
 			lines.push(`    exerciseType: duration`);
@@ -105,8 +108,10 @@ export function workoutToMarkdownBody(workout: Workout): string {
 		if (exercise.exerciseType === "timer") {
 			const w = formatTime(exercise.workSeconds ?? 0);
 			const r = formatTime(exercise.restSeconds ?? 0);
+			const t = exercise.transitionSeconds ?? 0;
 			const n = exercise.intervals ?? 0;
-			lines.push(`Intervals: ${n} \u00D7 ${w} work / ${r} rest`);
+			const switchPart = t > 0 ? ` / ${formatTime(t)} switch` : "";
+			lines.push(`Intervals: ${n} \u00D7 ${w} work / ${r} rest${switchPart}`);
 		} else if (exercise.exerciseType === "duration") {
 			lines.push("| Set | Time |");
 			lines.push("|-----|------|");

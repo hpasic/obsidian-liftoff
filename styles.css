@@ -316,6 +316,12 @@
 	padding: 16px;
 }
 
+/* Collapse hides content instead of unmounting it, so running timers
+   and in-progress holds survive an (accidental) header tap */
+.ln-exercise-card.ln-exercise-collapsed > *:not(.ln-exercise-header):not(.ln-exercise-notes) {
+	display: none;
+}
+
 .ln-exercise-header {
 	display: flex;
 	justify-content: space-between;
@@ -341,6 +347,26 @@
 .ln-exercise-set-count {
 	font-size: 11px;
 	color: var(--text-faint);
+}
+
+.ln-exercise-menu-btn {
+	/* Negative margin keeps the touch target big without padding out the header */
+	margin: -8px -6px;
+	padding: 8px 6px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-faint);
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.ln-exercise-menu-btn:hover,
+.ln-exercise-menu-btn:active {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
 }
 
 .ln-exercise-notes {
@@ -642,8 +668,8 @@
 
 .ln-timer-block-labels {
 	display: grid;
-	grid-template-columns: 1fr 1fr 1fr;
-	gap: 8px;
+	grid-template-columns: 1fr 1fr 1fr 1fr;
+	gap: 4px;
 	margin-bottom: 4px;
 }
 
@@ -657,14 +683,14 @@
 
 .ln-timer-block-inputs {
 	display: grid;
-	grid-template-columns: 1fr auto 1fr auto 1fr;
-	gap: 4px;
+	grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+	gap: 3px;
 	align-items: center;
 	margin-bottom: 12px;
 }
 
 .ln-timer-block .ln-timer-block-input {
-	padding: 10px 8px;
+	padding: 10px 2px;
 	border-radius: 8px;
 	border: none;
 	text-align: center;
@@ -739,6 +765,10 @@
 	color: var(--color-yellow);
 }
 
+.ln-timer-block-phase-transition {
+	color: var(--color-cyan);
+}
+
 .ln-timer-block-countdown {
 	font-size: 48px;
 	font-weight: 700;
@@ -770,6 +800,11 @@
 
 .ln-timer-resting {
 	background: rgba(var(--color-yellow-rgb, 224, 172, 0), 0.06);
+	border-radius: 12px;
+}
+
+.ln-timer-transition {
+	background: rgba(var(--color-cyan-rgb, 0, 191, 188), 0.06);
 	border-radius: 12px;
 }
 

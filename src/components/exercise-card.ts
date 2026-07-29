@@ -1,3 +1,4 @@
+import { Menu } from "obsidian";
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
 import { applyToBests, detectPRs, type PRBests, type PRKind } from "../utils/sets";
@@ -8,16 +9,20 @@ import { TimerBlock } from "./timer-block";
 export interface ExerciseCardCallbacks {
 	onExerciseChanged: (exercise: Exercise) => void;
 	onSetCompleted?: (set: WorkoutSet) => void;
+	// Omitted by the owner when the move is impossible (first/last exercise)
+	onMoveUp?: () => void;
+	onMoveDown?: () => void;
+	onRemove?: () => void;
 }
 
 interface SetRowLike {
-	getSet(): WorkoutSet;
 	destroy(): void;
 }
 
 export class ExerciseCard {
 	private containerEl: HTMLElement;
 	private setsContainerEl: HTMLElement;
+	private setCountEl: HTMLElement | null = null;
 	private setRows: SetRowLike[] = [];
 	private timerBlock: TimerBlock | null = null;
 	private expanded: boolean;
@@ -51,6 +56,7 @@ export class ExerciseCard {
 
 	private render(): void {
 		for (const row of this.setRows) row.destroy();
+		this.timerBlock?.destroy();
 		this.containerEl.empty();
 		this.setRows = [];
 		this.timerBlock = null;
@@ -70,24 +76,10 @@ export class ExerciseCard {
 			});
 		}
 
-		if (this.isTimer) {
-			headerRight.createSpan({
-				cls: "ln-exercise-set-count",
-				text: `\u23F1 ${this.exercise.intervals ?? this.settings.defaultWorkDuration}`,
-			});
-		} else if (this.isDuration) {
-			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
-			headerRight.createSpan({
-				cls: "ln-exercise-set-count",
-				text: `\u23F1 ${completedCount}/${this.exercise.sets.length}`,
-			});
-		} else {
-			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
-			headerRight.createSpan({
-				cls: "ln-exercise-set-count",
-				text: `${completedCount}/${this.exercise.sets.length}`,
-			});
-		}
+		this.setCountEl = headerRight.createSpan({ cls: "ln-exercise-set-count" });
+		this.updateSetCount();
+
+		this.renderMenuButton(headerRight);
 
 		// Exercise notes
 		const libraryEntry = this.settings.exerciseLibrary.find(
@@ -100,16 +92,13 @@ export class ExerciseCard {
 			});
 		}
 
-		// Toggle expand/collapse on header tap
+		// Toggle expand/collapse on header tap. Visibility-only (CSS class):
+		// re-rendering here would destroy a running timer or in-progress hold.
 		header.addEventListener("click", () => {
-			this.expanded = !this.expanded;
-			this.render();
+			this.setExpanded(!this.expanded);
 		});
 
-		if (!this.expanded) {
-			this.containerEl.addClass("ln-exercise-collapsed");
-			return;
-		}
+		this.containerEl.toggleClass("ln-exercise-collapsed", !this.expanded);
 
 		this.renderNoteField();
 
@@ -120,6 +109,39 @@ export class ExerciseCard {
 		} else {
 			this.renderWeightSets();
 		}
+	}
+
+	private renderMenuButton(parentEl: HTMLElement): void {
+		const { onMoveUp, onMoveDown, onRemove } = this.callbacks;
+		if (!onMoveUp && !onMoveDown && !onRemove) return;
+
+		const menuBtn = parentEl.createEl("button", {
+			cls: "ln-exercise-menu-btn",
+			text: "\u22EE",
+			attr: { "aria-label": "Exercise options" },
+		});
+		menuBtn.addEventListener("click", (evt) => {
+			// Header click toggles collapse — keep it off the menu button
+			evt.stopPropagation();
+
+			const menu = new Menu();
+			if (onMoveUp) {
+				menu.addItem((item) =>
+					item.setTitle("Move up").setIcon("arrow-up").onClick(() => onMoveUp())
+				);
+			}
+			if (onMoveDown) {
+				menu.addItem((item) =>
+					item.setTitle("Move down").setIcon("arrow-down").onClick(() => onMoveDown())
+				);
+			}
+			if (onRemove) {
+				menu.addItem((item) =>
+					item.setTitle("Remove exercise").setIcon("trash-2").onClick(() => onRemove())
+				);
+			}
+			menu.showAtMouseEvent(evt);
+		});
 	}
 
 	private renderNoteField(): void {
@@ -138,7 +160,7 @@ export class ExerciseCard {
 		noteEl.addEventListener("input", () => {
 			this.exercise.note = noteEl.value;
 			autoGrow();
-			this.callbacks.onExerciseChanged(this.exercise);
+			this.notifyChanged();
 		});
 		autoGrow();
 	}
@@ -168,17 +190,17 @@ export class ExerciseCard {
 				{
 					onSetChanged: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 					onSetCompleted: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 						this.callbacks.onSetCompleted?.(updatedSet);
 					},
 					onSetRemoved: () => {
 						this.exercise.sets.splice(i, 1);
 						this.render();
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 				}
 			);
@@ -198,7 +220,7 @@ export class ExerciseCard {
 				durationSeconds: 0,
 			});
 			this.render();
-			this.callbacks.onExerciseChanged(this.exercise);
+			this.notifyChanged();
 		});
 	}
 
@@ -207,35 +229,59 @@ export class ExerciseCard {
 		if (this.lastData && this.lastData.workSeconds !== undefined) {
 			const w = this.formatTime(this.lastData.workSeconds);
 			const r = this.formatTime(this.lastData.restSeconds ?? 0);
+			const t = this.lastData.transitionSeconds ?? 0;
 			const n = this.lastData.intervals ?? 0;
 			this.containerEl.createDiv({
 				cls: "ln-exercise-previous",
-				text: `Previous: ${w} / ${r} \u00D7 ${n}`,
+				text: `Previous: ${w} / ${r}${t > 0 ? ` / ${this.formatTime(t)}` : ""} \u00D7 ${n}`,
 			});
 		}
 
 		const workSec = this.exercise.workSeconds ?? this.settings.defaultWorkDuration;
 		const restSec = this.exercise.restSeconds ?? this.settings.defaultRestIntervalDuration;
+		const transitionSec = this.exercise.transitionSeconds ?? 0;
 		const intervals = this.exercise.intervals ?? 5;
+
+		// Resolved defaults are the exercise's state from now on — getExercise()
+		// reads them straight off the exercise, not off the timer block
+		this.exercise.workSeconds = workSec;
+		this.exercise.restSeconds = restSec;
+		this.exercise.transitionSeconds = transitionSec;
+		this.exercise.intervals = intervals;
+
+		const wasCompleted =
+			this.exercise.sets.length > 0 && this.exercise.sets.every((s) => s.completed);
 
 		this.timerBlock = new TimerBlock(
 			this.containerEl,
 			workSec,
 			restSec,
+			transitionSec,
 			intervals,
 			{
 				onCompleted: () => {
+					const count = this.timerBlock?.getState().intervals ?? intervals;
+					this.exercise.sets = Array.from({ length: count }, () => ({
+						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
+					}));
+					this.notifyChanged();
 					this.callbacks.onSetCompleted?.({
 						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
 					});
 				},
-				onChanged: (w, r, n) => {
+				onChanged: (w, r, t, n) => {
 					this.exercise.workSeconds = w;
 					this.exercise.restSeconds = r;
+					this.exercise.transitionSeconds = t;
 					this.exercise.intervals = n;
-					this.callbacks.onExerciseChanged(this.exercise);
+					this.notifyChanged();
 				},
-			}
+				onReset: () => {
+					this.exercise.sets = [];
+					this.notifyChanged();
+				},
+			},
+			wasCompleted
 		);
 	}
 
@@ -274,7 +320,7 @@ export class ExerciseCard {
 			};
 			this.exercise.sets.push(newSet);
 			this.render();
-			this.callbacks.onExerciseChanged(this.exercise);
+			this.notifyChanged();
 		});
 	}
 
@@ -297,11 +343,11 @@ export class ExerciseCard {
 				{
 					onSetChanged: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 					onSetCompleted: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 						if (updatedSet.completed) {
 							const prs = detectPRs(updatedSet, this.bests);
 							if (prs.length > 0) {
@@ -322,7 +368,7 @@ export class ExerciseCard {
 						this.exercise.sets.splice(i, 1);
 						this.shiftPrKindsForRemoval(i);
 						this.render();
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 				}
 			);
@@ -357,47 +403,57 @@ export class ExerciseCard {
 		}
 	}
 
+	/** Single choke point for data changes: keeps the header count live. */
+	private notifyChanged(): void {
+		this.updateSetCount();
+		this.callbacks.onExerciseChanged(this.exercise);
+	}
+
+	private updateSetCount(): void {
+		if (!this.setCountEl) return;
+		if (this.isTimer) {
+			this.setCountEl.textContent = `⏱ ${this.exercise.intervals ?? 5}`;
+		} else {
+			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
+			const prefix = this.isDuration ? "⏱ " : "";
+			this.setCountEl.textContent = `${prefix}${completedCount}/${this.exercise.sets.length}`;
+		}
+	}
+
 	private formatTime(seconds: number): string {
 		const m = Math.floor(seconds / 60);
 		const s = seconds % 60;
 		return `${m}:${String(s).padStart(2, "0")}`;
 	}
 
+	isExpanded(): boolean {
+		return this.expanded;
+	}
+
 	expand(): void {
-		this.expanded = true;
-		this.render();
+		this.setExpanded(true);
 	}
 
 	collapse(): void {
-		this.expanded = false;
-		this.render();
+		this.setExpanded(false);
+	}
+
+	private setExpanded(expanded: boolean): void {
+		this.expanded = expanded;
+		this.containerEl.toggleClass("ln-exercise-collapsed", !expanded);
 	}
 
 	getRootEl(): HTMLElement {
 		return this.containerEl;
 	}
 
+	/**
+	 * The exercise object is the single source of truth: set rows and the timer
+	 * block write straight into it, so a collapsed card (which renders no rows)
+	 * still reports its real sets.
+	 */
 	getExercise(): Exercise {
-		if (this.isTimer && this.timerBlock) {
-			const state = this.timerBlock.getState();
-			return {
-				name: this.exercise.name,
-				exerciseType: "timer",
-				workSeconds: state.workSeconds,
-				restSeconds: state.restSeconds,
-				intervals: state.intervals,
-				sets: state.completed
-					? Array.from({ length: state.intervals }, () => ({
-						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
-					}))
-					: [],
-			};
-		}
-		return {
-			name: this.exercise.name,
-			exerciseType: this.exercise.exerciseType,
-			sets: this.setRows.map((r) => r.getSet()),
-		};
+		return this.exercise;
 	}
 
 	destroy(): void {
