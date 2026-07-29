@@ -28,10 +28,12 @@ export class TemplateStore {
 			const exercises: TemplateExercise[] = [];
 			if (Array.isArray(fm.exercises)) {
 				for (const ex of fm.exercises as Array<Record<string, unknown>>) {
+					const rawType = ex.exerciseType;
 					exercises.push({
 						name: String(ex.name),
 						targetSets: Number(ex.targetSets) || 3,
-						exerciseType: ex.exerciseType === "timer" ? "timer" : undefined,
+						exerciseType:
+							rawType === "timer" || rawType === "duration" ? rawType : undefined,
 					});
 				}
 			}
@@ -60,8 +62,8 @@ export class TemplateStore {
 		for (const ex of template.exercises) {
 			lines.push(`  - name: ${ex.name}`);
 			lines.push(`    targetSets: ${ex.targetSets}`);
-			if (ex.exerciseType === "timer") {
-				lines.push(`    exerciseType: timer`);
+			if (ex.exerciseType === "timer" || ex.exerciseType === "duration") {
+				lines.push(`    exerciseType: ${ex.exerciseType}`);
 			}
 		}
 		lines.push("---");
