@@ -22,6 +22,7 @@ interface SetRowLike {
 export class ExerciseCard {
 	private containerEl: HTMLElement;
 	private setsContainerEl: HTMLElement;
+	private setCountEl: HTMLElement | null = null;
 	private setRows: SetRowLike[] = [];
 	private timerBlock: TimerBlock | null = null;
 	private expanded: boolean;
@@ -75,24 +76,8 @@ export class ExerciseCard {
 			});
 		}
 
-		if (this.isTimer) {
-			headerRight.createSpan({
-				cls: "ln-exercise-set-count",
-				text: `\u23F1 ${this.exercise.intervals ?? 5}`,
-			});
-		} else if (this.isDuration) {
-			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
-			headerRight.createSpan({
-				cls: "ln-exercise-set-count",
-				text: `\u23F1 ${completedCount}/${this.exercise.sets.length}`,
-			});
-		} else {
-			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
-			headerRight.createSpan({
-				cls: "ln-exercise-set-count",
-				text: `${completedCount}/${this.exercise.sets.length}`,
-			});
-		}
+		this.setCountEl = headerRight.createSpan({ cls: "ln-exercise-set-count" });
+		this.updateSetCount();
 
 		this.renderMenuButton(headerRight);
 
@@ -175,7 +160,7 @@ export class ExerciseCard {
 		noteEl.addEventListener("input", () => {
 			this.exercise.note = noteEl.value;
 			autoGrow();
-			this.callbacks.onExerciseChanged(this.exercise);
+			this.notifyChanged();
 		});
 		autoGrow();
 	}
@@ -205,17 +190,17 @@ export class ExerciseCard {
 				{
 					onSetChanged: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 					onSetCompleted: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 						this.callbacks.onSetCompleted?.(updatedSet);
 					},
 					onSetRemoved: () => {
 						this.exercise.sets.splice(i, 1);
 						this.render();
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 				}
 			);
@@ -235,7 +220,7 @@ export class ExerciseCard {
 				durationSeconds: 0,
 			});
 			this.render();
-			this.callbacks.onExerciseChanged(this.exercise);
+			this.notifyChanged();
 		});
 	}
 
@@ -279,7 +264,7 @@ export class ExerciseCard {
 					this.exercise.sets = Array.from({ length: count }, () => ({
 						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
 					}));
-					this.callbacks.onExerciseChanged(this.exercise);
+					this.notifyChanged();
 					this.callbacks.onSetCompleted?.({
 						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
 					});
@@ -289,11 +274,11 @@ export class ExerciseCard {
 					this.exercise.restSeconds = r;
 					this.exercise.transitionSeconds = t;
 					this.exercise.intervals = n;
-					this.callbacks.onExerciseChanged(this.exercise);
+					this.notifyChanged();
 				},
 				onReset: () => {
 					this.exercise.sets = [];
-					this.callbacks.onExerciseChanged(this.exercise);
+					this.notifyChanged();
 				},
 			},
 			wasCompleted
@@ -335,7 +320,7 @@ export class ExerciseCard {
 			};
 			this.exercise.sets.push(newSet);
 			this.render();
-			this.callbacks.onExerciseChanged(this.exercise);
+			this.notifyChanged();
 		});
 	}
 
@@ -358,11 +343,11 @@ export class ExerciseCard {
 				{
 					onSetChanged: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 					onSetCompleted: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 						if (updatedSet.completed) {
 							const prs = detectPRs(updatedSet, this.bests);
 							if (prs.length > 0) {
@@ -383,7 +368,7 @@ export class ExerciseCard {
 						this.exercise.sets.splice(i, 1);
 						this.shiftPrKindsForRemoval(i);
 						this.render();
-						this.callbacks.onExerciseChanged(this.exercise);
+						this.notifyChanged();
 					},
 				}
 			);
@@ -415,6 +400,23 @@ export class ExerciseCard {
 		this.bests = { ...this.historyBests };
 		for (const set of this.exercise.sets) {
 			if (set.completed) applyToBests(set, this.bests);
+		}
+	}
+
+	/** Single choke point for data changes: keeps the header count live. */
+	private notifyChanged(): void {
+		this.updateSetCount();
+		this.callbacks.onExerciseChanged(this.exercise);
+	}
+
+	private updateSetCount(): void {
+		if (!this.setCountEl) return;
+		if (this.isTimer) {
+			this.setCountEl.textContent = `⏱ ${this.exercise.intervals ?? 5}`;
+		} else {
+			const completedCount = this.exercise.sets.filter((s) => s.completed).length;
+			const prefix = this.isDuration ? "⏱ " : "";
+			this.setCountEl.textContent = `${prefix}${completedCount}/${this.exercise.sets.length}`;
 		}
 	}
 
