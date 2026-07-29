@@ -1,15 +1,30 @@
 export interface TimerBlockCallbacks {
 	onCompleted: () => void;
-	onChanged: (workSeconds: number, restSeconds: number, intervals: number) => void;
+	onChanged: (workSeconds: number, restSeconds: number, transitionSeconds: number, intervals: number) => void;
 }
 
 type TimerPhase = "idle" | "running" | "paused" | "completed";
-type RunPhase = "work" | "rest" | "countdown";
+type RunPhase = "work" | "rest" | "transition" | "countdown";
+
+const RUN_PHASE_CLASS: Record<RunPhase, string> = {
+	work: "ln-timer-working",
+	rest: "ln-timer-resting",
+	transition: "ln-timer-transition",
+	countdown: "ln-timer-countin",
+};
+
+const RUN_PHASE_LABEL: Record<RunPhase, string> = {
+	work: "WORK",
+	rest: "REST",
+	transition: "SWITCH SIDES",
+	countdown: "GET READY",
+};
 
 export class TimerBlock {
 	private containerEl: HTMLElement;
 	private workSeconds: number;
 	private restSeconds: number;
+	private transitionSeconds: number;
 	private intervals: number;
 	private phase: TimerPhase = "idle";
 	private runPhase: RunPhase = "work";
@@ -23,11 +38,13 @@ export class TimerBlock {
 		parentEl: HTMLElement,
 		workSeconds: number,
 		restSeconds: number,
+		transitionSeconds: number,
 		intervals: number,
 		private callbacks: TimerBlockCallbacks
 	) {
 		this.workSeconds = workSeconds;
 		this.restSeconds = restSeconds;
+		this.transitionSeconds = transitionSeconds;
 		this.intervals = intervals;
 		this.containerEl = parentEl.createDiv({ cls: "ln-timer-block" });
 		this.render();
@@ -42,15 +59,12 @@ export class TimerBlock {
 			"ln-timer-block-completed",
 			"ln-timer-working",
 			"ln-timer-resting",
+			"ln-timer-transition",
 			"ln-timer-countin"
 		);
 		this.containerEl.addClass(`ln-timer-block-${this.phase}`);
 		if (this.phase === "running") {
-			if (this.runPhase === "countdown") {
-				this.containerEl.addClass("ln-timer-countin");
-			} else {
-				this.containerEl.addClass(this.runPhase === "work" ? "ln-timer-working" : "ln-timer-resting");
-			}
+			this.containerEl.addClass(RUN_PHASE_CLASS[this.runPhase]);
 		}
 
 		if (this.phase === "idle") {
@@ -67,6 +81,7 @@ export class TimerBlock {
 		const labels = this.containerEl.createDiv({ cls: "ln-timer-block-labels" });
 		labels.createSpan({ text: "WORK" });
 		labels.createSpan({ text: "REST" });
+		labels.createSpan({ text: "SWITCH" });
 		labels.createSpan({ text: "INTERVALS" });
 
 		// Input row
@@ -84,6 +99,12 @@ export class TimerBlock {
 		});
 		inputs.createSpan({ cls: "ln-timer-block-unit", text: "s" });
 
+		const transitionInput = inputs.createEl("input", {
+			cls: "ln-timer-block-input",
+			attr: { type: "number", inputmode: "numeric", min: "0", value: String(this.transitionSeconds) },
+		});
+		inputs.createSpan({ cls: "ln-timer-block-unit", text: "s" });
+
 		const intervalsInput = inputs.createEl("input", {
 			cls: "ln-timer-block-input ln-timer-block-input-intervals",
 			attr: { type: "number", inputmode: "numeric", value: String(this.intervals) },
@@ -95,6 +116,10 @@ export class TimerBlock {
 		});
 		restInput.addEventListener("input", () => {
 			this.restSeconds = parseInt(restInput.value, 10) || 1;
+			this.notifyChanged();
+		});
+		transitionInput.addEventListener("input", () => {
+			this.transitionSeconds = Math.max(0, parseInt(transitionInput.value, 10) || 0);
 			this.notifyChanged();
 		});
 		intervalsInput.addEventListener("input", () => {
@@ -116,7 +141,7 @@ export class TimerBlock {
 		if (this.runPhase === "countdown") {
 			display.createDiv({
 				cls: "ln-timer-block-phase-label ln-timer-block-phase-countdown",
-				text: "GET READY",
+				text: RUN_PHASE_LABEL.countdown,
 			});
 
 			display.createDiv({
@@ -124,7 +149,7 @@ export class TimerBlock {
 				text: String(this.countdown),
 			});
 		} else {
-			const phaseLabel = this.runPhase === "work" ? "WORK" : "REST";
+			const phaseLabel = RUN_PHASE_LABEL[this.runPhase];
 
 			display.createDiv({
 				cls: "ln-timer-block-interval-label",
@@ -223,27 +248,27 @@ export class TimerBlock {
 			this.render();
 			this.tick();
 		} else if (this.runPhase === "work") {
-			// Work done → start rest
-			this.runPhase = "rest";
-			this.countdown = this.restSeconds;
-			this.render();
-			this.tick();
-		} else {
-			// Rest done → next interval or complete
 			if (this.currentInterval >= this.intervals) {
-				// All intervals done
+				// All intervals done — no trailing rest
 				this.completed = true;
 				this.phase = "completed";
 				this.render();
 				this.callbacks.onCompleted();
-			} else {
-				// Next interval
-				this.currentInterval++;
-				this.runPhase = "work";
-				this.countdown = this.workSeconds;
-				this.render();
-				this.tick();
+				return;
 			}
+			// Work done → switch sides after odd intervals, otherwise rest
+			const switching = this.transitionSeconds > 0 && this.currentInterval % 2 === 1;
+			this.runPhase = switching ? "transition" : "rest";
+			this.countdown = switching ? this.transitionSeconds : this.restSeconds;
+			this.render();
+			this.tick();
+		} else {
+			// Rest or switch done → next interval
+			this.currentInterval++;
+			this.runPhase = "work";
+			this.countdown = this.workSeconds;
+			this.render();
+			this.tick();
 		}
 	}
 
@@ -275,13 +300,14 @@ export class TimerBlock {
 	}
 
 	private notifyChanged(): void {
-		this.callbacks.onChanged(this.workSeconds, this.restSeconds, this.intervals);
+		this.callbacks.onChanged(this.workSeconds, this.restSeconds, this.transitionSeconds, this.intervals);
 	}
 
-	getState(): { workSeconds: number; restSeconds: number; intervals: number; completed: boolean } {
+	getState(): { workSeconds: number; restSeconds: number; transitionSeconds: number; intervals: number; completed: boolean } {
 		return {
 			workSeconds: this.workSeconds,
 			restSeconds: this.restSeconds,
+			transitionSeconds: this.transitionSeconds,
 			intervals: this.intervals,
 			completed: this.completed,
 		};

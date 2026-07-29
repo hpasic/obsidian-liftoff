@@ -43,6 +43,9 @@ export function workoutToFrontmatter(workout: Workout): string {
 			lines.push(`    exerciseType: timer`);
 			lines.push(`    workSeconds: ${exercise.workSeconds ?? 0}`);
 			lines.push(`    restSeconds: ${exercise.restSeconds ?? 0}`);
+			if (exercise.transitionSeconds) {
+				lines.push(`    transitionSeconds: ${exercise.transitionSeconds}`);
+			}
 			lines.push(`    intervals: ${exercise.intervals ?? 0}`);
 		} else if (exercise.exerciseType === "duration") {
 			lines.push(`    exerciseType: duration`);

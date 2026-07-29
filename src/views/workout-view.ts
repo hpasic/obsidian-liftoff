@@ -146,6 +146,7 @@ export class WorkoutView extends ItemView {
 			if (exercise.exerciseType === "timer") {
 				if (lastData.workSeconds !== undefined) exercise.workSeconds = lastData.workSeconds;
 				if (lastData.restSeconds !== undefined) exercise.restSeconds = lastData.restSeconds;
+				if (lastData.transitionSeconds !== undefined) exercise.transitionSeconds = lastData.transitionSeconds;
 				if (lastData.intervals !== undefined) exercise.intervals = lastData.intervals;
 			} else {
 				for (let i = 0; i < exercise.sets.length; i++) {
@@ -379,6 +380,7 @@ export class WorkoutView extends ItemView {
 				sets: [],
 				workSeconds: lastData?.workSeconds ?? this.plugin.settings.defaultWorkDuration,
 				restSeconds: lastData?.restSeconds ?? this.plugin.settings.defaultRestIntervalDuration,
+				transitionSeconds: lastData?.transitionSeconds ?? 0,
 				intervals: lastData?.intervals ?? 5,
 			};
 		} else if (exerciseType === "duration") {

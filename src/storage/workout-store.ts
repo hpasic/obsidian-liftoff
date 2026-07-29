@@ -91,6 +91,7 @@ export class WorkoutStore {
 						note,
 						workSeconds: Number(ex.workSeconds) || 0,
 						restSeconds: Number(ex.restSeconds) || 0,
+						transitionSeconds: Number(ex.transitionSeconds) || 0,
 						intervals: Number(ex.intervals) || 0,
 					});
 				} else if (ex.exerciseType === "duration") {
