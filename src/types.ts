@@ -21,6 +21,7 @@ export interface Exercise {
 	// Timer-specific (only used when exerciseType === "timer")
 	workSeconds?: number;
 	restSeconds?: number;
+	transitionSeconds?: number;
 	intervals?: number;
 }
 

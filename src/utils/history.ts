@@ -6,6 +6,7 @@ export interface LastExerciseData {
 	// Timer exercise data
 	workSeconds?: number;
 	restSeconds?: number;
+	transitionSeconds?: number;
 	intervals?: number;
 }
 
@@ -29,6 +30,7 @@ export function findLastSetsForExercise(
 				sets: exercise.sets,
 				workSeconds: exercise.workSeconds,
 				restSeconds: exercise.restSeconds,
+				transitionSeconds: exercise.transitionSeconds,
 				intervals: exercise.intervals,
 			};
 		}

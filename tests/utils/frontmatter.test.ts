@@ -81,6 +81,27 @@ describe("timer exercise frontmatter", () => {
 		expect(result).not.toContain("weight:");
 		expect(result).not.toContain("sets:");
 	});
+
+	it("omits transitionSeconds when absent or zero", () => {
+		expect(workoutToFrontmatter(timerWorkout)).not.toContain("transitionSeconds");
+
+		const zeroed: Workout = {
+			...timerWorkout,
+			exercises: [{ ...timerWorkout.exercises[0]!, transitionSeconds: 0 }],
+		};
+		expect(workoutToFrontmatter(zeroed)).not.toContain("transitionSeconds");
+	});
+
+	it("emits transitionSeconds when set", () => {
+		const w: Workout = {
+			...timerWorkout,
+			exercises: [{ ...timerWorkout.exercises[0]!, transitionSeconds: 5 }],
+		};
+		const result = workoutToFrontmatter(w);
+		expect(result).toContain("restSeconds: 20");
+		expect(result).toContain("transitionSeconds: 5");
+		expect(result).toContain("intervals: 5");
+	});
 });
 
 describe("timer exercise markdown body", () => {

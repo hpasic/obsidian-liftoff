@@ -216,12 +216,14 @@ export class ExerciseCard {
 
 		const workSec = this.exercise.workSeconds ?? this.settings.defaultWorkDuration;
 		const restSec = this.exercise.restSeconds ?? this.settings.defaultRestIntervalDuration;
+		const transitionSec = this.exercise.transitionSeconds ?? 0;
 		const intervals = this.exercise.intervals ?? 5;
 
 		this.timerBlock = new TimerBlock(
 			this.containerEl,
 			workSec,
 			restSec,
+			transitionSec,
 			intervals,
 			{
 				onCompleted: () => {
@@ -229,9 +231,10 @@ export class ExerciseCard {
 						weight: 0, reps: 0, unit: this.settings.weightUnit, completed: true,
 					});
 				},
-				onChanged: (w, r, n) => {
+				onChanged: (w, r, t, n) => {
 					this.exercise.workSeconds = w;
 					this.exercise.restSeconds = r;
+					this.exercise.transitionSeconds = t;
 					this.exercise.intervals = n;
 					this.callbacks.onExerciseChanged(this.exercise);
 				},
@@ -385,6 +388,7 @@ export class ExerciseCard {
 				exerciseType: "timer",
 				workSeconds: state.workSeconds,
 				restSeconds: state.restSeconds,
+				transitionSeconds: state.transitionSeconds,
 				intervals: state.intervals,
 				sets: state.completed
 					? Array.from({ length: state.intervals }, () => ({
