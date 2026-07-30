@@ -89,11 +89,17 @@ export default class LiftOffPlugin extends Plugin {
 			if (l !== leaf) l.detach();
 		}
 
+		// A leaf that is already a home view keeps its instance through
+		// setViewState — onOpen won't re-fire, so it must be refreshed explicitly
+		// (banner + recents change after finishing a workout). A fresh view
+		// renders in onOpen and must not render twice.
+		const reused = leaf.view instanceof HomeView;
 		await leaf.setViewState({
 			type: HOME_VIEW_TYPE,
 			active: true,
 		});
 		await this.app.workspace.revealLeaf(leaf);
+		if (reused && leaf.view instanceof HomeView) await leaf.view.renderHome();
 	}
 
 	async startWorkout(template: WorkoutTemplate | null): Promise<void> {

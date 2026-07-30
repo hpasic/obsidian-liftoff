@@ -195,6 +195,13 @@
 	margin-bottom: 6px;
 	border-radius: 10px;
 	background: var(--background-secondary);
+	cursor: pointer;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.ln-recent-item:active {
+	opacity: 0.8;
 }
 
 .ln-recent-info {
