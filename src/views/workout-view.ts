@@ -25,8 +25,8 @@ export class WorkoutView extends ItemView {
 	private activeRestExerciseIndex: number | null = null;
 	private recentWorkouts: Workout[] = [];
 	private initialized = false;
-	/** Collapsed/expanded state to restore on the next renderWorkout(), by exercise index. */
-	private pendingExpanded: boolean[] | null = null;
+	/** Parent of the exercise cards — structural ops append/reorder into it directly. */
+	private exercisesEl: HTMLElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LiftOffPlugin) {
 		super(leaf);
@@ -202,8 +202,6 @@ export class WorkoutView extends ItemView {
 		container.empty();
 		container.addClass("ln-workout-view");
 		this.exerciseCards = [];
-		const expandedToRestore = this.pendingExpanded;
-		this.pendingExpanded = null;
 
 		// Header
 		const header = container.createDiv({ cls: "ln-workout-header" });
@@ -237,41 +235,9 @@ export class WorkoutView extends ItemView {
 		});
 
 		// Exercise cards
-		const exercisesEl = container.createDiv({ cls: "ln-exercises" });
-		for (let i = 0; i < this.workout.exercises.length; i++) {
-			const exercise = this.workout.exercises[i]!;
-			const lastData = findLastSetsForExercise(this.recentWorkouts, exercise.name);
-			const bests = computeBests(this.recentWorkouts, exercise.name);
-			const cardIndex = i;
-			const callbacks: ExerciseCardCallbacks = {
-				onExerciseChanged: () => {
-					void this.persistState();
-				},
-				onSetCompleted: () => {
-					this.startRestTimerAt(cardIndex);
-					void this.persistState();
-				},
-				onRemove: () => {
-					void this.removeExercise(cardIndex);
-				},
-			};
-			if (i > 0) {
-				callbacks.onMoveUp = () => this.moveExercise(cardIndex, cardIndex - 1);
-			}
-			if (i < this.workout.exercises.length - 1) {
-				callbacks.onMoveDown = () => this.moveExercise(cardIndex, cardIndex + 1);
-			}
-
-			const card = new ExerciseCard(
-				exercisesEl,
-				exercise,
-				lastData,
-				this.plugin.settings,
-				bests,
-				callbacks
-			);
-			if (expandedToRestore?.[i] === false) card.collapse();
-			this.exerciseCards.push(card);
+		this.exercisesEl = container.createDiv({ cls: "ln-exercises" });
+		for (const exercise of this.workout.exercises) {
+			this.exerciseCards.push(this.createCard(this.exercisesEl, exercise));
 		}
 
 		// If a rest timer was active before re-render, re-mount it under the same card
@@ -299,6 +265,47 @@ export class WorkoutView extends ItemView {
 		finishBtn.addEventListener("click", () => {
 			void this.finishWorkout();
 		});
+	}
+
+	/**
+	 * Cards are reused across reorders and removals, so their callbacks must not
+	 * close over a construction-time index — every one resolves it at call time.
+	 */
+	private createCard(parentEl: HTMLElement, exercise: Exercise): ExerciseCard {
+		const lastData = findLastSetsForExercise(this.recentWorkouts, exercise.name);
+		const bests = computeBests(this.recentWorkouts, exercise.name);
+
+		let card: ExerciseCard;
+		const indexOf = () => this.exerciseCards.indexOf(card);
+		const callbacks: ExerciseCardCallbacks = {
+			onExerciseChanged: () => {
+				void this.persistState();
+			},
+			onSetCompleted: () => {
+				const i = indexOf();
+				if (i >= 0) this.startRestTimerAt(i);
+				void this.persistState();
+			},
+			onRemove: () => {
+				void this.removeExercise(indexOf());
+			},
+			canMoveUp: () => indexOf() > 0,
+			canMoveDown: () => {
+				const i = indexOf();
+				return i >= 0 && i < this.exerciseCards.length - 1;
+			},
+			onMoveUp: () => {
+				const i = indexOf();
+				this.moveExercise(i, i - 1);
+			},
+			onMoveDown: () => {
+				const i = indexOf();
+				this.moveExercise(i, i + 1);
+			},
+		};
+
+		card = new ExerciseCard(parentEl, exercise, lastData, this.plugin.settings, bests, callbacks);
+		return card;
 	}
 
 	private startElapsedTimer(el: HTMLElement): void {
@@ -441,37 +448,45 @@ export class WorkoutView extends ItemView {
 			}
 		}
 
-		const expanded = this.captureExpanded();
+		// Appended, never re-rendered: a running interval timer or duration hold on
+		// any existing card keeps ticking
 		this.workout.exercises.push(newExercise);
-		expanded.push(true);
-		this.pendingExpanded = expanded;
-		this.renderWorkout();
+		if (this.exercisesEl) {
+			this.exerciseCards.push(this.createCard(this.exercisesEl, newExercise));
+		} else {
+			this.renderWorkout();
+		}
 		void this.persistState();
 	}
 
-	private captureExpanded(): boolean[] {
-		return this.exerciseCards.map((c) => c.isExpanded());
-	}
-
 	private moveExercise(from: number, to: number): void {
-		const exercises = this.collectWorkout().exercises;
+		const exercises = this.workout.exercises;
 		if (from < 0 || to < 0 || from >= exercises.length || to >= exercises.length) return;
+		if (from === to) return;
 
-		const expanded = this.captureExpanded();
 		[exercises[from], exercises[to]] = [exercises[to]!, exercises[from]!];
-		[expanded[from], expanded[to]] = [expanded[to]!, expanded[from]!];
+		[this.exerciseCards[from], this.exerciseCards[to]] =
+			[this.exerciseCards[to]!, this.exerciseCards[from]!];
 
-		this.workout.exercises = exercises;
-		this.pendingExpanded = expanded;
+		// Re-append the existing roots in array order — moving a DOM node keeps its
+		// JS state, so nothing the cards are running is disturbed
+		if (this.exercisesEl) {
+			for (const card of this.exerciseCards) this.exercisesEl.appendChild(card.getRootEl());
+		}
+
 		this.activeRestExerciseIndex = remapIndexAfterSwap(this.activeRestExerciseIndex, from, to);
+		// The rest timer sits between two card roots; re-appending strands it at the top
+		if (this.activeRestExerciseIndex !== null) {
+			this.mountRestTimerAt(this.activeRestExerciseIndex);
+		}
 
-		this.renderWorkout();
 		void this.persistState();
 	}
 
 	private async removeExercise(index: number): Promise<void> {
 		const exercise = this.workout.exercises[index];
-		if (!exercise) return;
+		const card = this.exerciseCards[index];
+		if (!exercise || !card) return;
 
 		if (exercise.sets.some((s) => s.completed)) {
 			const confirmed = await new ConfirmModal(
@@ -481,21 +496,25 @@ export class WorkoutView extends ItemView {
 			if (!confirmed) return;
 		}
 
-		const exercises = this.collectWorkout().exercises;
-		const expanded = this.captureExpanded();
-		exercises.splice(index, 1);
-		expanded.splice(index, 1);
+		// A reorder may have shifted the card while the confirm modal was open
+		const at = this.exerciseCards.indexOf(card);
+		if (at === -1) return;
 
-		this.workout.exercises = exercises;
-		this.pendingExpanded = expanded;
+		// Only the outgoing card is torn down — destroy() clears its intervals
+		card.destroy();
+		this.exerciseCards.splice(at, 1);
+		this.workout.exercises.splice(at, 1);
 
 		if (this.activeRestExerciseIndex !== null) {
-			const nextRestIndex = remapIndexAfterRemoval(this.activeRestExerciseIndex, index);
-			if (nextRestIndex === null) this.stopRestTimer();
-			else this.activeRestExerciseIndex = nextRestIndex;
+			const nextRestIndex = remapIndexAfterRemoval(this.activeRestExerciseIndex, at);
+			if (nextRestIndex === null) {
+				this.stopRestTimer();
+			} else {
+				this.activeRestExerciseIndex = nextRestIndex;
+				this.mountRestTimerAt(nextRestIndex);
+			}
 		}
 
-		this.renderWorkout();
 		void this.persistState();
 	}
 
