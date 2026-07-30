@@ -9,9 +9,12 @@ import { TimerBlock } from "./timer-block";
 export interface ExerciseCardCallbacks {
 	onExerciseChanged: (exercise: Exercise) => void;
 	onSetCompleted?: (set: WorkoutSet) => void;
-	// Omitted by the owner when the move is impossible (first/last exercise)
 	onMoveUp?: () => void;
 	onMoveDown?: () => void;
+	// Cards outlive their position (reorder moves them, it does not rebuild them),
+	// so the menu asks at click time whether the move is still possible
+	canMoveUp?: () => boolean;
+	canMoveDown?: () => boolean;
 	onRemove?: () => void;
 }
 
@@ -125,12 +128,12 @@ export class ExerciseCard {
 			evt.stopPropagation();
 
 			const menu = new Menu();
-			if (onMoveUp) {
+			if (onMoveUp && (this.callbacks.canMoveUp?.() ?? true)) {
 				menu.addItem((item) =>
 					item.setTitle("Move up").setIcon("arrow-up").onClick(() => onMoveUp())
 				);
 			}
-			if (onMoveDown) {
+			if (onMoveDown && (this.callbacks.canMoveDown?.() ?? true)) {
 				menu.addItem((item) =>
 					item.setTitle("Move down").setIcon("arrow-down").onClick(() => onMoveDown())
 				);
@@ -424,18 +427,6 @@ export class ExerciseCard {
 		const m = Math.floor(seconds / 60);
 		const s = seconds % 60;
 		return `${m}:${String(s).padStart(2, "0")}`;
-	}
-
-	isExpanded(): boolean {
-		return this.expanded;
-	}
-
-	expand(): void {
-		this.setExpanded(true);
-	}
-
-	collapse(): void {
-		this.setExpanded(false);
 	}
 
 	private setExpanded(expanded: boolean): void {
