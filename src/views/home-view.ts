@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf, Notice, TFile, normalizePath } from "obsidian";
 import type LiftOffPlugin from "../main";
 import type { WorkoutTemplate } from "../types";
 import { TextInputModal, ConfirmModal } from "../components/modals";
@@ -9,6 +9,8 @@ export const HOME_VIEW_TYPE = "liftoff-home";
 
 export class HomeView extends ItemView {
 	private plugin: LiftOffPlugin;
+	/** Lets a newer renderHome() supersede one still awaiting template reads. */
+	private renderSeq = 0;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LiftOffPlugin) {
 		super(leaf);
@@ -28,10 +30,19 @@ export class HomeView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
+		// A workout note saved moments ago has no metadata-cache entry yet, so
+		// getRecentWorkouts() can't see it — re-render once the cache indexes it
+		this.registerEvent(
+			this.app.metadataCache.on("changed", (file) => {
+				const folder = normalizePath(this.plugin.settings.workoutFolder);
+				if (file.path.startsWith(folder + "/")) void this.renderHome();
+			})
+		);
 		await this.renderHome();
 	}
 
 	async renderHome(): Promise<void> {
+		const seq = ++this.renderSeq;
 		const container = this.containerEl.children[1] as HTMLElement;
 		container.empty();
 		container.addClass("ln-home-view");
@@ -63,6 +74,9 @@ export class HomeView extends ItemView {
 
 		const templatesList = templatesSection.createDiv({ cls: "ln-templates-list" });
 		await this.renderTemplates(templatesList);
+		// A concurrent render may have emptied the container during the await —
+		// let the newest one finish the job
+		if (seq !== this.renderSeq) return;
 
 		// Exercises section
 		const exercisesSection = container.createDiv({ cls: "ln-section" });
@@ -229,6 +243,13 @@ export class HomeView extends ItemView {
 			item.createSpan({
 				cls: "ln-recent-date",
 				text: workout.date,
+			});
+
+			item.addEventListener("click", () => {
+				const file = this.app.vault.getAbstractFileByPath(workout.path);
+				if (file instanceof TFile) {
+					void this.app.workspace.getLeaf("tab").openFile(file);
+				}
 			});
 		}
 	}
