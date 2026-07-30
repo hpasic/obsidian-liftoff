@@ -186,7 +186,7 @@ export default class LiftOffPlugin extends Plugin {
 			this.activeWorkout = raw.activeWorkout ?? null;
 		} else {
 			// Legacy shape: data.json was the settings object itself.
-			this.settings = { ...DEFAULT_SETTINGS, ...(raw as Partial<LiftOffSettings> | null) };
+			this.settings = { ...DEFAULT_SETTINGS, ...raw };
 			this.activeWorkout = null;
 		}
 	}

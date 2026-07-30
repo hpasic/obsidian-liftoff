@@ -1,5 +1,13 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import type { LiftOffSettings } from "./types";
 import type LiftOffPlugin from "./main";
+
+function parseRestTimerPresets(value: string): number[] {
+	return value
+		.split(",")
+		.map((s) => parseInt(s.trim(), 10))
+		.filter((n) => !isNaN(n) && n > 0);
+}
 
 export class LiftOffSettingTab extends PluginSettingTab {
 	plugin: LiftOffPlugin;
@@ -9,6 +17,118 @@ export class LiftOffSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				name: "Workout folder",
+				desc: "Folder where workout notes are saved",
+				control: { type: "text", key: "workoutFolder", placeholder: "Workouts" },
+			},
+			{
+				name: "Template folder",
+				desc: "Folder where workout templates are stored",
+				control: { type: "text", key: "templateFolder", placeholder: "Workout templates" },
+			},
+			{
+				name: "Weight unit",
+				desc: "Default weight unit for new sets",
+				control: {
+					type: "dropdown",
+					key: "weightUnit",
+					options: { kg: "Kilograms (kg)", lbs: "Pounds (lbs)" },
+				},
+			},
+			{
+				name: "Rest timer presets",
+				desc: "Comma-separated list of rest timer durations in seconds",
+				control: {
+					type: "text",
+					key: "restTimerPresets",
+					placeholder: "30, 60, 90, 120",
+					validate: (value) =>
+						parseRestTimerPresets(value).length > 0
+							? undefined
+							: "Enter a comma-separated list of seconds, e.g. 30, 60, 90.",
+				},
+			},
+			{
+				name: "Default rest duration",
+				desc: "Default rest timer duration in seconds",
+				control: { type: "number", key: "defaultRestDuration", placeholder: "90", min: 1, step: 1 },
+			},
+			{
+				type: "group",
+				heading: "Timer exercises",
+				items: [
+					{
+						name: "Default work duration",
+						desc: "Default work phase duration in seconds for timer exercises",
+						control: {
+							type: "number",
+							key: "defaultWorkDuration",
+							placeholder: "40",
+							min: 1,
+							step: 1,
+						},
+					},
+					{
+						name: "Default rest interval duration",
+						desc: "Default rest phase duration in seconds for timer exercises",
+						control: {
+							type: "number",
+							key: "defaultRestIntervalDuration",
+							placeholder: "20",
+							min: 1,
+							step: 1,
+						},
+					},
+				],
+			},
+		];
+	}
+
+	getControlValue(key: string): unknown {
+		if (key === "restTimerPresets") {
+			return this.plugin.settings.restTimerPresets.join(", ");
+		}
+		return this.plugin.settings[key as keyof LiftOffSettings];
+	}
+
+	setControlValue(key: string, value: unknown): void | Promise<void> {
+		const settings = this.plugin.settings;
+		switch (key) {
+			case "workoutFolder":
+				settings.workoutFolder = String(value);
+				break;
+			case "templateFolder":
+				settings.templateFolder = String(value);
+				break;
+			case "weightUnit":
+				if (value !== "kg" && value !== "lbs") return;
+				settings.weightUnit = value;
+				break;
+			case "restTimerPresets": {
+				const presets = parseRestTimerPresets(String(value));
+				if (presets.length === 0) return;
+				settings.restTimerPresets = presets;
+				break;
+			}
+			case "defaultRestDuration":
+			case "defaultWorkDuration":
+			case "defaultRestIntervalDuration": {
+				const num = typeof value === "number" ? Math.floor(value) : NaN;
+				if (!Number.isFinite(num) || num <= 0) return;
+				settings[key] = num;
+				break;
+			}
+			default:
+				return;
+		}
+		return this.plugin.saveSettings();
+	}
+
+	// Fallback for Obsidian < 1.13.0 only — never called on newer versions,
+	// where the tab renders declaratively from getSettingDefinitions().
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
@@ -61,10 +181,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 					.setPlaceholder("30, 60, 90, 120")
 					.setValue(this.plugin.settings.restTimerPresets.join(", "))
 					.onChange(async (value) => {
-						const presets = value
-							.split(",")
-							.map((s) => parseInt(s.trim(), 10))
-							.filter((n) => !isNaN(n) && n > 0);
+						const presets = parseRestTimerPresets(value);
 						if (presets.length > 0) {
 							this.plugin.settings.restTimerPresets = presets;
 							await this.plugin.saveSettings();
