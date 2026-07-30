@@ -31,11 +31,25 @@ export class HomeView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		// A workout note saved moments ago has no metadata-cache entry yet, so
-		// getRecentWorkouts() can't see it — re-render once the cache indexes it
+		// getRecentWorkouts() can't see it — re-render once the cache indexes it.
+		// Renames and deletes don't emit "changed", so they get their own hooks.
+		const inWorkoutFolder = (path: string): boolean => {
+			const folder = normalizePath(this.plugin.settings.workoutFolder);
+			return folder === "/" || path.startsWith(folder + "/");
+		};
 		this.registerEvent(
 			this.app.metadataCache.on("changed", (file) => {
-				const folder = normalizePath(this.plugin.settings.workoutFolder);
-				if (file.path.startsWith(folder + "/")) void this.renderHome();
+				if (inWorkoutFolder(file.path)) void this.renderHome();
+			})
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				if (inWorkoutFolder(file.path)) void this.renderHome();
+			})
+		);
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (inWorkoutFolder(file.path) || inWorkoutFolder(oldPath)) void this.renderHome();
 			})
 		);
 		await this.renderHome();
