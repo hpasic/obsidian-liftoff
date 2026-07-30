@@ -429,18 +429,6 @@ export class ExerciseCard {
 		return `${m}:${String(s).padStart(2, "0")}`;
 	}
 
-	isExpanded(): boolean {
-		return this.expanded;
-	}
-
-	expand(): void {
-		this.setExpanded(true);
-	}
-
-	collapse(): void {
-		this.setExpanded(false);
-	}
-
 	private setExpanded(expanded: boolean): void {
 		this.expanded = expanded;
 		this.containerEl.toggleClass("ln-exercise-collapsed", !expanded);

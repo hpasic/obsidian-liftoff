@@ -69,6 +69,8 @@ export class WorkoutView extends ItemView {
 
 	startFromTemplate(template: WorkoutTemplate): void {
 		this.initialized = true;
+		// A reused view instance may still be running the previous workout's rest timer
+		this.stopRestTimer();
 		this.workout = this.createEmptyWorkout();
 		this.workout.template = template.name;
 		this.workout.exercises = template.exercises.map((te) => {
@@ -116,6 +118,7 @@ export class WorkoutView extends ItemView {
 
 	startEmpty(): void {
 		this.initialized = true;
+		this.stopRestTimer();
 		this.workout = this.createEmptyWorkout();
 		this.startTime = new Date();
 		this.loadRecentWorkouts();
@@ -448,34 +451,39 @@ export class WorkoutView extends ItemView {
 			}
 		}
 
+		// exercisesEl always exists here — the add button is created by the same
+		// render that assigns it. Bail rather than fall back to a full re-render,
+		// which would destroy running timers.
+		if (!this.exercisesEl) return;
+
 		// Appended, never re-rendered: a running interval timer or duration hold on
 		// any existing card keeps ticking
 		this.workout.exercises.push(newExercise);
-		if (this.exercisesEl) {
-			this.exerciseCards.push(this.createCard(this.exercisesEl, newExercise));
-		} else {
-			this.renderWorkout();
-		}
+		this.exerciseCards.push(this.createCard(this.exercisesEl, newExercise));
 		void this.persistState();
 	}
 
 	private moveExercise(from: number, to: number): void {
 		const exercises = this.workout.exercises;
 		if (from < 0 || to < 0 || from >= exercises.length || to >= exercises.length) return;
-		if (from === to) return;
+		// The menu only moves by one; the single-node insert below relies on adjacency
+		if (Math.abs(from - to) !== 1) return;
 
 		[exercises[from], exercises[to]] = [exercises[to]!, exercises[from]!];
 		[this.exerciseCards[from], this.exerciseCards[to]] =
 			[this.exerciseCards[to]!, this.exerciseCards[from]!];
 
-		// Re-append the existing roots in array order — moving a DOM node keeps its
-		// JS state, so nothing the cards are running is disturbed
-		if (this.exercisesEl) {
-			for (const card of this.exerciseCards) this.exercisesEl.appendChild(card.getRootEl());
-		}
+		// Move exactly one DOM node — a moved node keeps its JS state, so nothing
+		// the cards are running is disturbed, and untouched cards don't replay
+		// their CSS animations
+		const lo = Math.min(from, to);
+		this.exercisesEl?.insertBefore(
+			this.exerciseCards[lo]!.getRootEl(),
+			this.exerciseCards[lo + 1]!.getRootEl()
+		);
 
 		this.activeRestExerciseIndex = remapIndexAfterSwap(this.activeRestExerciseIndex, from, to);
-		// The rest timer sits between two card roots; re-appending strands it at the top
+		// The rest timer sits between two card roots; the insert can strand it
 		if (this.activeRestExerciseIndex !== null) {
 			this.mountRestTimerAt(this.activeRestExerciseIndex);
 		}
