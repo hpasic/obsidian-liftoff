@@ -22,6 +22,7 @@ function formatTime(seconds: number): string {
 export class DurationSetRow {
 	private containerEl: HTMLElement;
 	private displayEl!: HTMLElement;
+	private setNumberBtn!: HTMLButtonElement;
 	private set: WorkoutSet;
 	private state: State;
 	private startTimeMs: number | null = null;
@@ -61,13 +62,11 @@ export class DurationSetRow {
 
 		// Set number / type cycle
 		const type = effectiveSetType(this.set);
-		const typeLabel = SET_TYPE_LABEL[type];
-		const setNumberBtn = this.containerEl.createEl("button", {
+		this.setNumberBtn = this.containerEl.createEl("button", {
 			cls: `ln-set-number ln-set-type-${type}`,
-			text: typeLabel || String(this.setNumber),
-			attr: { "aria-label": `Set ${this.setNumber} (${type}). Tap to change type.` },
 		});
-		setNumberBtn.addEventListener("click", () => {
+		this.updateSetNumber(this.setNumber);
+		this.setNumberBtn.addEventListener("click", () => {
 			this.set.setType = NEXT_SET_TYPE[effectiveSetType(this.set)];
 			this.callbacks.onSetChanged(this.set);
 			this.render();
@@ -153,6 +152,13 @@ export class DurationSetRow {
 			window.clearInterval(this.intervalId);
 			this.intervalId = null;
 		}
+	}
+
+	updateSetNumber(setNumber: number): void {
+		this.setNumber = setNumber;
+		const type = effectiveSetType(this.set);
+		this.setNumberBtn.textContent = SET_TYPE_LABEL[type] || String(setNumber);
+		this.setNumberBtn.setAttr("aria-label", `Set ${setNumber} (${type}). Tap to change type.`);
 	}
 
 	getSet(): WorkoutSet {
