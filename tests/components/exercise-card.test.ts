@@ -26,6 +26,83 @@ function expectDurationSets(card: ExerciseCard, rows: DurationSetRow[], sets: Wo
 }
 
 describe("ExerciseCard duration set operations", () => {
+	it("refreshes previous hints after removal and append without interrupting a shifted hold", () => {
+		const tracking = trackIntervals();
+		const data = exercise("Plank", "duration");
+		data.sets = [workoutSet(), workoutSet(), workoutSet()];
+		const lastData = {
+			date: "2026-09-20",
+			sets: [30, 60, 90].map((durationSeconds) => ({ ...workoutSet(), durationSeconds })),
+		};
+		const card = new ExerciseCard(document.body, data, lastData, DEFAULT_SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const root = card.getRootEl();
+		const rows = [...card["setRows"]] as DurationSetRow[];
+		const hints = () => Array.from(root.querySelectorAll(".ln-duration-previous"), (el) => el.textContent);
+		expect(hints()).toEqual(["prev 0:30", "prev 1:00", "prev 1:30"]);
+		const running = rows[1]!;
+		const runningRoot = running.getRootEl();
+		click(runningRoot, ".ln-duration-action");
+		const display = element(runningRoot, ".ln-duration-display");
+		const ids = tracking.ids();
+		expect(ids).toHaveLength(1);
+		vi.advanceTimersByTime(5250);
+		expect(display.textContent).toBe("0:05");
+
+		click(rows[0]!.getRootEl(), ".ln-set-remove");
+		rows.shift();
+		expectDurationSets(card, rows, [workoutSet(), workoutSet()]);
+		expect(hints()).toEqual(["prev 0:30", "prev 1:00"]);
+		expect(element(runningRoot, ".ln-duration-display")).toBe(display);
+		expect(display.textContent).toBe("0:05");
+		expect(tracking.ids()).toEqual(ids);
+		expect(tracking.clear).not.toHaveBeenCalled();
+
+		click(root, ".ln-add-set-btn");
+		rows.push(card["setRows"][2] as DurationSetRow);
+		expectDurationSets(card, rows, [workoutSet(), workoutSet(), workoutSet()]);
+		expect(hints()).toEqual(["prev 0:30", "prev 1:00", "prev 1:30"]);
+		expect(element(runningRoot, ".ln-duration-display")).toBe(display);
+		expect(display.textContent).toBe("0:05");
+		expect(tracking.ids()).toEqual(ids);
+		expect(tracking.clear).not.toHaveBeenCalled();
+		expect(vi.getTimerCount()).toBe(1);
+		vi.advanceTimersByTime(2000);
+		expect(display.textContent).toBe("0:07");
+		expect(element(runningRoot, ".ln-duration-action").textContent).toBe("Stop");
+		click(runningRoot, ".ln-duration-action");
+		expect(data.sets[0]).toMatchObject({ durationSeconds: 7, completed: true });
+		expect(runningRoot.querySelector(".ln-duration-previous")).toBeNull();
+		click(runningRoot, ".ln-duration-action");
+		expect(element(runningRoot, ".ln-duration-previous").textContent).toBe("prev 0:30");
+		card.destroy();
+		tracking.expectClearedOnce(ids);
+	});
+
+	it.each([
+		[0, undefined, "prev 0:00"],
+		[undefined, 0, null],
+	] as const)("updates hint visibility when shifting from %s/%s history", (first, second, expected) => {
+		const data = exercise("Plank", "duration");
+		data.sets = [workoutSet(), workoutSet(), { ...workoutSet(), durationSeconds: 5 }];
+		const lastData = {
+			date: "2026-09-20",
+			sets: [first, second, 0].map((durationSeconds) => ({ ...workoutSet(), durationSeconds })),
+		};
+		const card = new ExerciseCard(document.body, data, lastData, DEFAULT_SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const rows = [...card["setRows"]] as DurationSetRow[];
+		const shiftedRoot = rows[1]!.getRootEl();
+		const display = element(shiftedRoot, ".ln-duration-display");
+		expect(shiftedRoot.querySelector(".ln-duration-previous")?.textContent ?? null)
+			.toBe(second === undefined ? null : "prev 0:00");
+		click(rows[0]!.getRootEl(), ".ln-set-remove");
+		expect(shiftedRoot.querySelector(".ln-duration-previous")?.textContent ?? null).toBe(expected);
+		expect(element(shiftedRoot, ".ln-duration-display")).toBe(display);
+		expect(rows[2]!.getRootEl().querySelector(".ln-duration-previous")).toBeNull();
+		card.destroy();
+	});
+
 	it("preserves a 90-second hold across append/removal and stops at its current index", () => {
 		const tracking = trackIntervals();
 		const data = exercise("Plank", "duration");

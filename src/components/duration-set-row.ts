@@ -65,7 +65,6 @@ export class DurationSetRow {
 		this.setNumberBtn = this.containerEl.createEl("button", {
 			cls: `ln-set-number ln-set-type-${type}`,
 		});
-		this.updateSetNumber(this.setNumber);
 		this.setNumberBtn.addEventListener("click", () => {
 			this.set.setType = NEXT_SET_TYPE[effectiveSetType(this.set)];
 			this.callbacks.onSetChanged(this.set);
@@ -78,12 +77,7 @@ export class DurationSetRow {
 			cls: "ln-duration-display",
 			text: formatTime(this.set.durationSeconds ?? 0),
 		});
-		if (this.previousSeconds !== null && (this.set.durationSeconds ?? 0) === 0) {
-			middle.createDiv({
-				cls: "ln-duration-previous",
-				text: `prev ${formatTime(this.previousSeconds)}`,
-			});
-		}
+		this.updateSetNumber(this.setNumber, this.previousSeconds);
 
 		// Action button (start / stop / reset)
 		const actionBtn = this.containerEl.createEl("button", {
@@ -154,11 +148,21 @@ export class DurationSetRow {
 		}
 	}
 
-	updateSetNumber(setNumber: number): void {
+	updateSetNumber(setNumber: number, previousSeconds: number | null): void {
 		this.setNumber = setNumber;
+		this.previousSeconds = previousSeconds;
 		const type = effectiveSetType(this.set);
 		this.setNumberBtn.textContent = SET_TYPE_LABEL[type] || String(setNumber);
 		this.setNumberBtn.setAttr("aria-label", `Set ${setNumber} (${type}). Tap to change type.`);
+
+		const middle = this.displayEl.parentElement!;
+		const hint = middle.querySelector<HTMLElement>(".ln-duration-previous");
+		if (previousSeconds !== null && (this.set.durationSeconds ?? 0) === 0) {
+			const previousEl = hint ?? middle.createDiv({ cls: "ln-duration-previous" });
+			previousEl.textContent = `prev ${formatTime(previousSeconds)}`;
+		} else {
+			hint?.remove();
+		}
 	}
 
 	getSet(): WorkoutSet {

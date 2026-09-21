@@ -232,7 +232,9 @@ export class ExerciseCard {
 					this.exercise.sets.splice(i, 1);
 					for (let j = i; j < this.setRows.length; j++) {
 						const remainingRow = this.setRows[j];
-						if (remainingRow instanceof DurationSetRow) remainingRow.updateSetNumber(j + 1);
+						if (remainingRow instanceof DurationSetRow) {
+							remainingRow.updateSetNumber(j + 1, this.lastData?.sets[j]?.durationSeconds ?? prevBest);
+						}
 					}
 					this.notifyChanged();
 				},
