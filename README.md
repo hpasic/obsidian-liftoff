@@ -79,4 +79,4 @@ Configure workout and template folders, default weight unit, and rest timer pres
 
 ## Credits
 
-The built-in exercise catalog is generated from the MIT-licensed open exercise dataset by Hasan Emir Yıldırım — text fields only, no media. See [`src/data/EXERCISE-DATASET-LICENSE.md`](src/data/EXERCISE-DATASET-LICENSE.md).
+The built-in exercise catalog is generated from the MIT-licensed [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) by Hasan Emir Yıldırım — text fields only, no media. See [`src/data/EXERCISE-DATASET-LICENSE.md`](src/data/EXERCISE-DATASET-LICENSE.md).
