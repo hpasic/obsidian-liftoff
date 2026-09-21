@@ -265,9 +265,7 @@ describe("WorkoutView teardown", () => {
 		expect(workout).toEqual(snapshot);
 	});
 
-	// src/views/workout-view.ts:326 registers a closure on every render,
-	// and onClose (line 568) clears the same elapsed ID without nulling it.
-	it.fails("clears every interval exactly once across rerenders, onClose and component unload", async () => {
+	it("clears every interval exactly once across rerenders, onClose and component unload", async () => {
 		const { view, tracking, workout } = running();
 		view.resume({ workout, startTimeMs: Date.now() });
 		view.resume({ workout, startTimeMs: Date.now() });

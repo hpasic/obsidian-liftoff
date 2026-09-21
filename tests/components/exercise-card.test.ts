@@ -245,6 +245,29 @@ describe("ExerciseCard duration set operations", () => {
 });
 
 describe("ExerciseCard", () => {
+	it("rolls back a removed PR before detecting the next completed set", () => {
+		const data = exercise("Bench Press");
+		data.sets = [
+			{ ...workoutSet(), weight: 100, reps: 5 },
+			{ ...workoutSet(), weight: 90, reps: 5 },
+		];
+		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, {
+			maxWeight: 80,
+			maxOneRM: 80 * (1 + 5 / 30),
+			maxVolume: 400,
+		}, { onExerciseChanged: vi.fn() });
+
+		const first = element(card.getRootEl(), ".ln-sets-container > .ln-set-row");
+		click(first, ".ln-set-check");
+		expect(first.nextElementSibling?.classList.contains("ln-pr-badge")).toBe(true);
+		click(first, ".ln-set-remove");
+
+		const second = element(card.getRootEl(), ".ln-sets-container > .ln-set-row");
+		click(second, ".ln-set-check");
+		expect(second.nextElementSibling?.classList.contains("ln-pr-badge")).toBe(true);
+		card.destroy();
+	});
+
 	it.each(["timer", "duration"] as const)("collapse preserves a running %s and destroy clears it exactly once", (type) => {
 		const tracking = trackIntervals();
 		const data = exercise("Exercise", type);

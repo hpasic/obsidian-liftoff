@@ -386,6 +386,7 @@ export class ExerciseCard {
 					onSetRemoved: () => {
 						this.exercise.sets.splice(i, 1);
 						this.shiftPrKindsForRemoval(i);
+						this.recomputeBests();
 						this.render();
 						this.notifyChanged();
 					},
