@@ -22,6 +22,7 @@ function formatTime(seconds: number): string {
 export class DurationSetRow {
 	private containerEl: HTMLElement;
 	private displayEl!: HTMLElement;
+	private setNumberBtn!: HTMLButtonElement;
 	private set: WorkoutSet;
 	private state: State;
 	private startTimeMs: number | null = null;
@@ -61,13 +62,10 @@ export class DurationSetRow {
 
 		// Set number / type cycle
 		const type = effectiveSetType(this.set);
-		const typeLabel = SET_TYPE_LABEL[type];
-		const setNumberBtn = this.containerEl.createEl("button", {
+		this.setNumberBtn = this.containerEl.createEl("button", {
 			cls: `ln-set-number ln-set-type-${type}`,
-			text: typeLabel || String(this.setNumber),
-			attr: { "aria-label": `Set ${this.setNumber} (${type}). Tap to change type.` },
 		});
-		setNumberBtn.addEventListener("click", () => {
+		this.setNumberBtn.addEventListener("click", () => {
 			this.set.setType = NEXT_SET_TYPE[effectiveSetType(this.set)];
 			this.callbacks.onSetChanged(this.set);
 			this.render();
@@ -79,12 +77,7 @@ export class DurationSetRow {
 			cls: "ln-duration-display",
 			text: formatTime(this.set.durationSeconds ?? 0),
 		});
-		if (this.previousSeconds !== null && (this.set.durationSeconds ?? 0) === 0) {
-			middle.createDiv({
-				cls: "ln-duration-previous",
-				text: `prev ${formatTime(this.previousSeconds)}`,
-			});
-		}
+		this.updateSetNumber(this.setNumber, this.previousSeconds);
 
 		// Action button (start / stop / reset)
 		const actionBtn = this.containerEl.createEl("button", {
@@ -152,6 +145,23 @@ export class DurationSetRow {
 		if (this.intervalId !== null) {
 			window.clearInterval(this.intervalId);
 			this.intervalId = null;
+		}
+	}
+
+	updateSetNumber(setNumber: number, previousSeconds: number | null): void {
+		this.setNumber = setNumber;
+		this.previousSeconds = previousSeconds;
+		const type = effectiveSetType(this.set);
+		this.setNumberBtn.textContent = SET_TYPE_LABEL[type] || String(setNumber);
+		this.setNumberBtn.setAttr("aria-label", `Set ${setNumber} (${type}). Tap to change type.`);
+
+		const middle = this.displayEl.parentElement!;
+		const hint = middle.querySelector<HTMLElement>(".ln-duration-previous");
+		if (previousSeconds !== null && (this.set.durationSeconds ?? 0) === 0) {
+			const previousEl = hint ?? middle.createDiv({ cls: "ln-duration-previous" });
+			previousEl.textContent = `prev ${formatTime(previousSeconds)}`;
+		} else {
+			hint?.remove();
 		}
 	}
 

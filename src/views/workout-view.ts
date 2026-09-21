@@ -10,6 +10,7 @@ import { findLastSetsForExercise } from "../utils/history";
 import { remapIndexAfterRemoval, remapIndexAfterSwap } from "../utils/reorder";
 import { computeBests } from "../utils/sets";
 import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
+import { formatLocalDate } from "../utils/date";
 
 export const WORKOUT_VIEW_TYPE = "liftoff-workout";
 
@@ -19,6 +20,7 @@ export class WorkoutView extends ItemView {
 	private exerciseCards: ExerciseCard[] = [];
 	private startTime: Date;
 	private timerIntervalId: number | null = null;
+	private hasElapsedTimerCleanup = false;
 	private restTimerIntervalId: number | null = null;
 	private restStartTime: number | null = null;
 	private restTimerEl: HTMLElement | null = null;
@@ -52,7 +54,7 @@ export class WorkoutView extends ItemView {
 		return {
 			type: "workout",
 			template: null,
-			date: now.toISOString().split("T")[0]!,
+			date: formatLocalDate(now),
 			start: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
 			end: null,
 			duration: null,
@@ -314,6 +316,7 @@ export class WorkoutView extends ItemView {
 	private startElapsedTimer(el: HTMLElement): void {
 		if (this.timerIntervalId !== null) {
 			window.clearInterval(this.timerIntervalId);
+			this.timerIntervalId = null;
 		}
 		const update = () => {
 			const elapsed = Math.floor((Date.now() - this.startTime.getTime()) / 1000);
@@ -323,11 +326,15 @@ export class WorkoutView extends ItemView {
 		};
 		update();
 		this.timerIntervalId = window.setInterval(update, 1000);
-		this.register(() => {
-			if (this.timerIntervalId !== null) {
-				window.clearInterval(this.timerIntervalId);
-			}
-		});
+		if (!this.hasElapsedTimerCleanup) {
+			this.hasElapsedTimerCleanup = true;
+			this.register(() => {
+				if (this.timerIntervalId !== null) {
+					window.clearInterval(this.timerIntervalId);
+					this.timerIntervalId = null;
+				}
+			});
+		}
 	}
 
 	private startRestTimerAt(exerciseIndex: number): void {
@@ -566,6 +573,7 @@ export class WorkoutView extends ItemView {
 	onClose(): Promise<void> {
 		if (this.timerIntervalId !== null) {
 			window.clearInterval(this.timerIntervalId);
+			this.timerIntervalId = null;
 		}
 		this.stopRestTimer();
 		for (const card of this.exerciseCards) card.destroy();

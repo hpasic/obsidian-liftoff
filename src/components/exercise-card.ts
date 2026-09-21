@@ -181,33 +181,7 @@ export class ExerciseCard {
 		this.setsContainerEl = this.containerEl.createDiv({ cls: "ln-sets-container" });
 
 		for (let i = 0; i < this.exercise.sets.length; i++) {
-			const set = this.exercise.sets[i]!;
-			const previousSet = this.lastData?.sets[i];
-			const prev = previousSet?.durationSeconds ?? prevBest;
-
-			const row = new DurationSetRow(
-				this.setsContainerEl,
-				i + 1,
-				set,
-				prev ?? null,
-				{
-					onSetChanged: (updatedSet) => {
-						this.exercise.sets[i] = updatedSet;
-						this.notifyChanged();
-					},
-					onSetCompleted: (updatedSet) => {
-						this.exercise.sets[i] = updatedSet;
-						this.notifyChanged();
-						this.callbacks.onSetCompleted?.(updatedSet);
-					},
-					onSetRemoved: () => {
-						this.exercise.sets.splice(i, 1);
-						this.render();
-						this.notifyChanged();
-					},
-				}
-			);
-			this.setRows.push(row);
+			this.appendDurationSet(i, prevBest);
 		}
 
 		const addSetBtn = this.containerEl.createDiv({
@@ -222,9 +196,51 @@ export class ExerciseCard {
 				completed: false,
 				durationSeconds: 0,
 			});
-			this.render();
+			this.appendDurationSet(this.exercise.sets.length - 1, prevBest);
 			this.notifyChanged();
 		});
+	}
+
+	private appendDurationSet(index: number, prevBest: number | null): void {
+		const set = this.exercise.sets[index]!;
+		const previousSeconds = this.lastData?.sets[index]?.durationSeconds ?? prevBest;
+		const row = new DurationSetRow(
+			this.setsContainerEl,
+			index + 1,
+			set,
+			previousSeconds,
+			{
+				// Rows survive removals, so resolve their position at callback time.
+				onSetChanged: (updatedSet) => {
+					const i = this.setRows.indexOf(row);
+					if (i === -1) return;
+					this.exercise.sets[i] = updatedSet;
+					this.notifyChanged();
+				},
+				onSetCompleted: (updatedSet) => {
+					const i = this.setRows.indexOf(row);
+					if (i === -1) return;
+					this.exercise.sets[i] = updatedSet;
+					this.notifyChanged();
+					this.callbacks.onSetCompleted?.(updatedSet);
+				},
+				onSetRemoved: () => {
+					const i = this.setRows.indexOf(row);
+					if (i === -1) return;
+					row.destroy();
+					this.setRows.splice(i, 1);
+					this.exercise.sets.splice(i, 1);
+					for (let j = i; j < this.setRows.length; j++) {
+						const remainingRow = this.setRows[j];
+						if (remainingRow instanceof DurationSetRow) {
+							remainingRow.updateSetNumber(j + 1, this.lastData?.sets[j]?.durationSeconds ?? prevBest);
+						}
+					}
+					this.notifyChanged();
+				},
+			}
+		);
+		this.setRows.push(row);
 	}
 
 	private renderTimer(): void {
@@ -370,6 +386,7 @@ export class ExerciseCard {
 					onSetRemoved: () => {
 						this.exercise.sets.splice(i, 1);
 						this.shiftPrKindsForRemoval(i);
+						this.recomputeBests();
 						this.render();
 						this.notifyChanged();
 					},
