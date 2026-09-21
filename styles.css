@@ -1088,6 +1088,8 @@
 
 .ln-exercise-result {
 	padding: 12px;
+	min-height: 44px;
+	box-sizing: border-box;
 	border-radius: 8px;
 	cursor: pointer;
 	font-size: 14px;
@@ -1102,6 +1104,69 @@
 .ln-exercise-create {
 	color: var(--interactive-accent);
 	font-weight: 500;
+}
+
+/* Body-part filter: one row, scrolls sideways instead of wrapping */
+.ln-picker-chips {
+	display: flex;
+	gap: 8px;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+	padding-bottom: 8px;
+	margin-bottom: 4px;
+}
+
+.ln-picker-chips::-webkit-scrollbar {
+	display: none;
+}
+
+.ln-picker-chip {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 0 14px;
+	border-radius: 22px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: 13px;
+	white-space: nowrap;
+	text-transform: capitalize;
+	cursor: pointer;
+}
+
+.ln-picker-chip-active {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.ln-catalog-result {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 2px;
+	padding: 8px 12px;
+}
+
+.ln-catalog-name {
+	font-size: 14px;
+	color: var(--text-normal);
+}
+
+.ln-catalog-meta {
+	font-size: 11px;
+	color: var(--text-faint);
+	text-transform: capitalize;
+}
+
+.ln-picker-empty,
+.ln-picker-more {
+	padding: 10px 12px;
+	font-size: 12px;
+	color: var(--text-faint);
 }
 
 /* Mobile: extra bottom padding so the last picker items can be scrolled above the on-screen keyboard */

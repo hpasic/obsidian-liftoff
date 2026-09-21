@@ -3,7 +3,7 @@ import type LiftOffPlugin from "../main";
 import type { ActiveWorkout, Workout, Exercise, ExerciseType } from "../types";
 import type { WorkoutTemplate } from "../types";
 import { ExerciseCard, type ExerciseCardCallbacks } from "../components/exercise-card";
-import { ExercisePickerModal } from "../components/exercise-picker";
+import { ExercisePickerModal, type ExerciseSource } from "../components/exercise-picker";
 import { ConfirmModal } from "../components/modals";
 import { TimerModal } from "./timer-view";
 import { findLastSetsForExercise } from "../utils/history";
@@ -393,18 +393,18 @@ export class WorkoutView extends ItemView {
 			this.app,
 			this.plugin.settings.exerciseLibrary,
 			recentNames,
-			(name, exerciseType) => {
-				this.addExercise(name, exerciseType);
+			(name, exerciseType, source) => {
+				this.addExercise(name, exerciseType, source);
 			}
 		).open();
 	}
 
-	private addExercise(name: string, exerciseType: ExerciseType): void {
+	private addExercise(name: string, exerciseType: ExerciseType, source?: ExerciseSource): void {
 		const existing = this.plugin.settings.exerciseLibrary.find(
 			(e) => e.name.toLowerCase() === name.toLowerCase()
 		);
 		if (!existing) {
-			this.plugin.settings.exerciseLibrary.push({ name, exerciseType });
+			this.plugin.settings.exerciseLibrary.push({ name, exerciseType, source });
 			void this.plugin.saveSettings();
 		} else if (!existing.exerciseType && exerciseType !== "weight") {
 			existing.exerciseType = exerciseType;

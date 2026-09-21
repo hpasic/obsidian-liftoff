@@ -56,6 +56,8 @@ export interface ExerciseLibraryEntry {
 	name: string;
 	exerciseType?: ExerciseType;
 	notes?: string;
+	/** Set when the entry was copied in from the bundled catalog. Absent = user-created. */
+	source?: "catalog";
 }
 
 export interface LiftOffSettings {
