@@ -1,6 +1,7 @@
 /*
- * Regenerates src/data/exercise-catalog.ts from the open exercise dataset
- * (JSON array with id, name, body_part, equipment, target, secondary_muscles,
+ * Regenerates src/data/exercise-catalog.ts from the exercises dataset at
+ * https://github.com/hasaneyldrm/exercises-dataset (file: data/exercises.json —
+ * a JSON array with id, name, body_part, equipment, target, secondary_muscles,
  * ...). Offline — takes the dataset path as an argument.
  *
  *   node scripts/build-exercise-catalog.mjs /path/to/exercises.json

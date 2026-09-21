@@ -1,8 +1,12 @@
 # Bundled exercise catalog — attribution
 
-`exercise-catalog.ts` is generated from the open exercise dataset by Hasan Emir
+`exercise-catalog.ts` is generated from the [exercises
+dataset](https://github.com/hasaneyldrm/exercises-dataset) by Hasan Emir
 Yıldırım, used under the MIT License. Only the text fields are bundled: name,
 body part, equipment, target muscle, and secondary muscles.
+
+The notice below is also reproduced in the `main.js` build banner, so it reaches
+users who only ever download the release assets.
 
 LiftOff ships **no media** from that dataset. The dataset's images and videos are
 © [Gym visual](https://gymvisual.com/), are excluded from its MIT grant, and are

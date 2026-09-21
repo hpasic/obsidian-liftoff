@@ -1,4 +1,5 @@
-import type { CatalogExercise } from "./exercise-catalog";
+import type { ExerciseLibraryEntry } from "../types";
+import { normalizeName, type CatalogExercise } from "./exercise-catalog";
 
 /** Gym shorthand the dataset spells out, so "db curl" finds "Dumbbell curl". */
 const TOKEN_ALIASES: Record<string, string> = {
@@ -23,6 +24,26 @@ export function matchesTokens(haystack: string, tokens: string[]): boolean {
 		if (haystack.includes(token)) return true;
 		const alias = TOKEN_ALIASES[token];
 		return alias !== undefined && haystack.includes(alias);
+	});
+}
+
+/**
+ * A library entry that matches a catalog name is the same exercise, so it
+ * borrows that row's metadata: the user's "Barbell bench press" is findable by
+ * "pectorals" and survives the "chest" chip even though the stored entry holds
+ * nothing but a name. Entries with no catalog twin match on name alone and
+ * stay hidden while a chip is active — there is nothing to filter them by.
+ */
+export function filterLibrary(
+	library: ExerciseLibraryEntry[],
+	catalogByName: Map<string, CatalogExercise>,
+	filter: { tokens: string[]; bodyPart: string | null }
+): ExerciseLibraryEntry[] {
+	return library.filter((entry) => {
+		const twin = catalogByName.get(normalizeName(entry.name));
+		if (filter.bodyPart !== null && twin?.bodyPart !== filter.bodyPart) return false;
+		const haystack = twin ? `${entry.name.toLowerCase()} ${twin.haystack}` : entry.name.toLowerCase();
+		return matchesTokens(haystack, filter.tokens);
 	});
 }
 
@@ -57,7 +78,7 @@ export function filterCatalog(
 	const matches: CatalogExercise[] = [];
 	for (const exercise of catalog) {
 		if (filter.bodyPart !== null && exercise.bodyPart !== filter.bodyPart) continue;
-		if (filter.excludeNames.has(exercise.name.toLowerCase())) continue;
+		if (filter.excludeNames.has(normalizeName(exercise.name))) continue;
 		if (!matchesTokens(exercise.haystack, filter.tokens)) continue;
 		matches.push(exercise);
 	}

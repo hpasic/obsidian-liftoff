@@ -1,7 +1,13 @@
 import { App, Modal } from "obsidian";
 import type { ExerciseLibraryEntry, ExerciseType } from "../types";
-import { getCatalog, getCatalogBodyParts, type CatalogExercise } from "../utils/exercise-catalog";
-import { filterCatalog, matchesTokens, tokenizeQuery } from "../utils/exercise-search";
+import {
+	getCatalog,
+	getCatalogByName,
+	getCatalogBodyParts,
+	normalizeName,
+	type CatalogExercise,
+} from "../utils/exercise-catalog";
+import { filterCatalog, filterLibrary, tokenizeQuery } from "../utils/exercise-search";
 
 /** Catalog rows rendered at once. Beyond this the user is told to keep typing. */
 const CATALOG_RENDER_CAP = 50;
@@ -102,11 +108,10 @@ export class ExercisePickerModal extends Modal {
 	}
 
 	private renderFilteredResults(query: string, tokens: string[], hasQuery: boolean): void {
-		// A body-part chip cannot filter library entries (they carry no body
-		// part), so with a chip and no query we show the catalog alone.
-		const libraryMatches = hasQuery
-			? this.library.filter((e) => matchesTokens(e.name.toLowerCase(), tokens))
-			: [];
+		const libraryMatches = filterLibrary(this.library, getCatalogByName(), {
+			tokens,
+			bodyPart: this.activeBodyPart,
+		});
 
 		if (libraryMatches.length > 0) {
 			this.addSectionLabel("My library");
@@ -116,7 +121,7 @@ export class ExercisePickerModal extends Modal {
 		const { items, total } = filterCatalog(getCatalog(), {
 			tokens,
 			bodyPart: this.activeBodyPart,
-			excludeNames: new Set(this.library.map((e) => e.name.toLowerCase())),
+			excludeNames: new Set(this.library.map((e) => normalizeName(e.name))),
 			limit: CATALOG_RENDER_CAP,
 		});
 
@@ -132,11 +137,12 @@ export class ExercisePickerModal extends Modal {
 			});
 		}
 
-		const queryLower = query.toLowerCase();
-		const exactMatch =
-			this.library.some((e) => e.name.toLowerCase() === queryLower) ||
-			items.some((e) => e.name.toLowerCase() === queryLower);
-		if (hasQuery && !exactMatch) this.addCreateItems(query);
+		// Only the user's own library suppresses the create rows. A catalog name
+		// match must not: "burpee" ships as a duration hold, and creating it as
+		// an interval timer instead has to stay one tap away.
+		const queryLower = normalizeName(query);
+		const owned = this.library.some((e) => normalizeName(e.name) === queryLower);
+		if (hasQuery && !owned) this.addCreateItems(query);
 	}
 
 	private addSectionLabel(text: string): void {

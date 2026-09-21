@@ -17,6 +17,14 @@ function sectionLabels(root: HTMLElement): string[] {
 	);
 }
 
+function clickChip(root: HTMLElement, bodyPart: string): void {
+	const chip = Array.from(root.querySelectorAll<HTMLElement>(".ln-picker-chip")).find(
+		(el) => el.textContent === bodyPart
+	);
+	expect(chip, bodyPart).toBeDefined();
+	chip!.click();
+}
+
 function catalogNames(root: HTMLElement): string[] {
 	return Array.from(root.querySelectorAll(".ln-catalog-name")).map((el) => el.textContent ?? "");
 }
@@ -64,6 +72,31 @@ describe("ExercisePickerModal catalog", () => {
 		input(root, ".ln-exercise-search", "front plank with twist");
 		click(root, ".ln-catalog-result");
 		expect(onSelect).toHaveBeenCalledWith("Front plank with twist", "duration", "catalog");
+	});
+
+	it("still offers the create rows when the query is an exact catalog name", () => {
+		const { root, onSelect } = openPicker();
+		input(root, ".ln-exercise-search", "burpee");
+		expect(catalogNames(root)).toContain("⏲ Burpee");
+		click(root, ".ln-exercise-create-timer");
+		expect(onSelect).toHaveBeenCalledWith("burpee", "timer");
+	});
+
+	it("shows an owned exercise under its catalog body part, exactly once", () => {
+		const { root } = openPicker([{ name: "Barbell bench press", exerciseType: "weight" }]);
+		clickChip(root, "chest");
+
+		expect(sectionLabels(root)).toEqual(["My library", "Catalog"]);
+		expect(element(root, ".ln-exercise-result").textContent).toBe("Barbell bench press");
+		expect(catalogNames(root)).not.toContain("Barbell bench press");
+	});
+
+	it("finds an owned exercise by metadata it never stored", () => {
+		const { root } = openPicker([{ name: "Barbell bench press" }]);
+		input(root, ".ln-exercise-search", "pectorals barbell bench press");
+
+		expect(sectionLabels(root)).toContain("My library");
+		expect(element(root, ".ln-exercise-result").textContent).toBe("Barbell bench press");
 	});
 
 	it("keeps the custom create path last", () => {

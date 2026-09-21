@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { getCatalog, getCatalogBodyParts, type CatalogExercise } from "../../src/utils/exercise-catalog";
-import { filterCatalog, matchesTokens, tokenizeQuery } from "../../src/utils/exercise-search";
+import {
+	getCatalog,
+	getCatalogBodyParts,
+	getCatalogByName,
+	type CatalogExercise,
+} from "../../src/utils/exercise-catalog";
+import {
+	filterCatalog,
+	filterLibrary,
+	matchesTokens,
+	tokenizeQuery,
+} from "../../src/utils/exercise-search";
 
 function entry(name: string, target: string, equipment: string, bodyPart = "chest"): CatalogExercise {
 	return {
@@ -92,6 +102,31 @@ describe("filterCatalog", () => {
 	it("keeps catalog order when there is no query", () => {
 		const { items } = filterCatalog(sample, { ...anything });
 		expect(items.map((e) => e.name)).toEqual(sample.map((e) => e.name));
+	});
+});
+
+describe("filterLibrary", () => {
+	const twins = getCatalogByName();
+	const owned = [{ name: "Barbell bench press" }, { name: "Haris special" }];
+
+	it("keeps an owned exercise visible under its catalog body-part chip", () => {
+		const shown = filterLibrary(owned, twins, { tokens: [], bodyPart: "chest" });
+		expect(shown.map((e) => e.name)).toEqual(["Barbell bench press"]);
+	});
+
+	it("matches an owned exercise on metadata it never stored", () => {
+		const tokens = tokenizeQuery("pectorals barbell bench press");
+		expect(filterLibrary(owned, twins, { tokens, bodyPart: null })).toHaveLength(1);
+	});
+
+	it("matches a catalog-less entry on its name and hides it under any chip", () => {
+		expect(filterLibrary(owned, twins, { tokens: ["haris"], bodyPart: null })).toHaveLength(1);
+		expect(filterLibrary(owned, twins, { tokens: ["haris"], bodyPart: "chest" })).toHaveLength(0);
+	});
+
+	it("pairs twins on a trimmed, case-folded name", () => {
+		const sloppy = [{ name: "  barbell BENCH press " }];
+		expect(filterLibrary(sloppy, twins, { tokens: [], bodyPart: "chest" })).toHaveLength(1);
 	});
 });
 
