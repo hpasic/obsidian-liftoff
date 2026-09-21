@@ -10,6 +10,7 @@ import { findLastSetsForExercise } from "../utils/history";
 import { remapIndexAfterRemoval, remapIndexAfterSwap } from "../utils/reorder";
 import { computeBests } from "../utils/sets";
 import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
+import { formatLocalDate } from "../utils/date";
 
 export const WORKOUT_VIEW_TYPE = "liftoff-workout";
 
@@ -52,7 +53,7 @@ export class WorkoutView extends ItemView {
 		return {
 			type: "workout",
 			template: null,
-			date: now.toISOString().split("T")[0]!,
+			date: formatLocalDate(now),
 			start: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
 			end: null,
 			duration: null,
