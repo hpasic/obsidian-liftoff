@@ -1109,6 +1109,7 @@
 /* Body-part filter: one row, scrolls sideways instead of wrapping */
 .ln-picker-chips {
 	display: flex;
+	flex-shrink: 0; /* the mobile modal is a flex column; don't let results squash the row */
 	gap: 8px;
 	overflow-x: auto;
 	-webkit-overflow-scrolling: touch;
