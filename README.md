@@ -24,7 +24,7 @@ Mobile-first gym workout tracker for [Obsidian](https://obsidian.md). Log sets, 
 
 ### Workout tracking
 
-Log sets with weight and reps. Previous session data is pre-filled so you can pick up where you left off. Tap the set number to cycle its type — **W**armup, working, **D**rop, or **F**ailure — and warmups and drop sets are automatically excluded from volume and PR calculations. Add a free-text note to any exercise to capture how it felt. Next session, that note appears under the exercise name, so "increase weight next time" is right where you need it. An exercise with a note is saved even if you completed no sets.
+Log sets with weight and reps. Previous session data is pre-filled so you can pick up where you left off. Tap the set number to cycle its type — **W**armup, working, **D**rop, or **F**ailure — and warmups and drop sets are automatically excluded from volume and PR calculations. Add a free-text note to any exercise to capture how it felt. Next session, that note appears under the exercise name, so "increase weight next time" is right where you need it. An exercise with a note is saved even if you completed no sets, and it doesn't hide your previous numbers: pre-fill still comes from the last session where you actually logged sets. An interval timer you never started is saved as not started, with its note but without its settings.
 
 ![Active workout](screenshots/workout-active.png)
 
@@ -48,9 +48,9 @@ Every saved workout gets a `## Summary` section with total duration, working-set
 
 A built-in rest timer with preset durations, an interval timer for HIIT-style work/rest sets, and count-up duration holds for static exercises like planks, dead hangs, and L-sits.
 
-Starting a hold first counts down a short get-set buffer (5 seconds by default) so you can get into position. The same buffer is subtracted when you stop, covering the time it takes to get back to your phone, so the saved time is the hold itself. Enter an added weight on a hold for loaded carries and weighted planks; leave it empty for bodyweight.
+Starting a hold first counts down a short get-set buffer (5 seconds by default) so you can get into position. The same buffer is subtracted when you stop, covering the time it takes to get back to your phone, so the saved time is the hold itself. Stopping before the hold outlasts the buffer records nothing. Enter an added weight on a hold for loaded carries and weighted planks; leave it empty for bodyweight. A weight carried over from last time keeps its original unit, even if you've since switched the default unit.
 
-While any timer, hold, or rest timer is running, LiftOff keeps the screen from turning off.
+While any timer or hold is running, LiftOff keeps the screen from turning off. The rest timer keeps it on for up to 10 minutes of rest.
 
 <p align="center">
   <img src="screenshots/rest-timer.png" width="400" alt="Rest timer with preset durations" />
@@ -71,7 +71,7 @@ Adding an exercise searches your own library and a built-in catalog of 1,300+ ex
 
 ### Settings
 
-Configure workout and template folders, default weight unit, rest timer presets, the hold buffer (set it to 0 to turn it off), and whether to keep the screen awake while timers run.
+Configure workout and template folders, default weight unit, rest timer presets, the hold buffer (0 to 60 seconds; 0 turns it off), and whether to keep the screen awake while timers run.
 
 ![Settings](screenshots/settings.png)
 
