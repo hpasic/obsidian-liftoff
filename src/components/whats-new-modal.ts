@@ -1,5 +1,4 @@
-import { App, Component, MarkdownRenderer, Modal } from "obsidian";
-import type { LiftOffSettings } from "../types";
+import { App, Component, MarkdownRenderer, Modal, requireApiVersion } from "obsidian";
 import { compareVersions, parseChangelog, sectionsSince, type ChangelogSection } from "../utils/changelog";
 
 /** Most versions shown at once after a long gap between updates. */
@@ -41,24 +40,39 @@ export class WhatsNewModal extends Modal {
 }
 
 /**
- * After an update, show the notes for every version since the one the user last
- * saw, once. A first install only records the version. The version is recorded
- * even when the "Show what's new" toggle is off.
+ * Per-device marker of the version whose notes were seen. Kept in the vault's
+ * localStorage, not data.json: each device shows the window once, and startup
+ * never rewrites a synced data.json.
  */
-export async function showWhatsNewIfUpdated(
-	app: App,
-	settings: LiftOffSettings,
-	currentVersion: string,
-	changelog: string,
-	save: () => Promise<void>
-): Promise<void> {
-	const lastSeen = settings.lastSeenVersion;
-	if (lastSeen !== undefined && compareVersions(currentVersion, lastSeen) <= 0) return;
+export const LAST_SEEN_VERSION_KEY = "liftoff-last-seen-version";
 
-	if (lastSeen !== undefined && settings.showWhatsNew) {
-		const sections = sectionsSince(parseChangelog(changelog), lastSeen, currentVersion, MAX_SECTIONS);
-		if (sections.length > 0) new WhatsNewModal(app, currentVersion, sections).open();
+/**
+ * After an update, show the notes for every version since the one this device
+ * last saw, once.
+ * - No data.json and no marker: first install — record the version, show nothing.
+ * - data.json but no marker: upgrade from an unknown version — show the current notes.
+ * - Older marker: show every version since it (newest first, capped).
+ * The marker is recorded even when `showWhatsNew` is off.
+ */
+export function showWhatsNewIfUpdated(
+	app: App,
+	options: { hadSavedData: boolean; showWhatsNew: boolean },
+	currentVersion: string,
+	changelog: string
+): void {
+	// Vault localStorage needs Obsidian 1.8.7+; older versions just skip the window
+	if (requireApiVersion("1.8.7")) {
+		const stored: unknown = app.loadLocalStorage(LAST_SEEN_VERSION_KEY);
+		const lastSeen = typeof stored === "string" ? stored : null;
+		if (lastSeen !== null && compareVersions(currentVersion, lastSeen) <= 0) return;
+
+		if (options.showWhatsNew && (lastSeen !== null || options.hadSavedData)) {
+			const sections = parseChangelog(changelog);
+			const shown = lastSeen !== null
+				? sectionsSince(sections, lastSeen, currentVersion, MAX_SECTIONS)
+				: sections.filter((s) => compareVersions(s.version, currentVersion) === 0);
+			if (shown.length > 0) new WhatsNewModal(app, currentVersion, shown).open();
+		}
+		app.saveLocalStorage(LAST_SEEN_VERSION_KEY, currentVersion);
 	}
-	settings.lastSeenVersion = currentVersion;
-	await save();
 }

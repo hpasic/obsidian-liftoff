@@ -73,7 +73,7 @@ Adding an exercise searches your own library and a built-in catalog of 1,300+ ex
 
 Configure workout and template folders, default weight unit, rest timer presets, the hold buffer (0 to 60 seconds; 0 turns it off), and whether to keep the screen awake while timers run.
 
-After an update, LiftOff shows what's new since the version you last used. Turn this off with **Show what's new after updates**. The full history is in [CHANGELOG.md](CHANGELOG.md).
+After an update, LiftOff shows what's new since the version you last used on that device. Turn this off with **Show what's new after updates**. The full history is in [CHANGELOG.md](CHANGELOG.md).
 
 ![Settings](screenshots/settings.png)
 

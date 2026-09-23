@@ -30,7 +30,7 @@ describe("hold buffer setting", () => {
 });
 
 describe("what's new setting", () => {
-	it("shows a default-on toggle and never exposes the last seen version", async () => {
+	it("shows a default-on toggle", async () => {
 		const { plugin, tab } = setup();
 		expect(plugin.settings.showWhatsNew).toBe(true);
 		const defs = tab.getSettingDefinitions();
@@ -38,11 +38,9 @@ describe("what's new setting", () => {
 			name: "Show what's new after updates",
 			control: { type: "toggle", key: "showWhatsNew" },
 		}));
-		expect(JSON.stringify(defs)).not.toContain("lastSeenVersion");
 		await tab.setControlValue("showWhatsNew", false);
 		expect(plugin.settings.showWhatsNew).toBe(false);
-		await tab.setControlValue("lastSeenVersion", "9.9.9");
-		expect(plugin.settings.lastSeenVersion).toBeUndefined();
+		expect(plugin.settings).not.toHaveProperty("lastSeenVersion");
 	});
 });
 

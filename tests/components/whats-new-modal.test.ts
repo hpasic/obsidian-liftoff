@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
-import { showWhatsNewIfUpdated } from "../../src/components/whats-new-modal";
-import { DEFAULT_SETTINGS, type LiftOffSettings } from "../../src/types";
+import { afterEach, describe, expect, it } from "vitest";
+import { setApiVersion } from "../mocks/obsidian";
+import { LAST_SEEN_VERSION_KEY, showWhatsNewIfUpdated } from "../../src/components/whats-new-modal";
 import { click, element } from "../helpers/dom";
 
 const changelog = `# Changelog
@@ -27,65 +27,89 @@ const changelog = `# Changelog
 - Three
 `;
 
-function settings(extra: Partial<LiftOffSettings> = {}): LiftOffSettings {
-	return { ...DEFAULT_SETTINGS, exerciseLibrary: [], ...extra };
+/** One device: its vault-scoped localStorage. */
+function device(lastSeen?: string) {
+	const storage = new Map<string, unknown>();
+	if (lastSeen !== undefined) storage.set(LAST_SEEN_VERSION_KEY, lastSeen);
+	const app = {
+		loadLocalStorage: (key: string) => storage.get(key) ?? null,
+		saveLocalStorage: (key: string, value: unknown) => void storage.set(key, value),
+	};
+	return { app, marker: () => storage.get(LAST_SEEN_VERSION_KEY) };
 }
 
 const modal = () => document.querySelector<HTMLElement>(".ln-whats-new");
+const body = () => element(modal()!, ".ln-whats-new-body").textContent;
 
-async function load(s: LiftOffSettings, version: string) {
-	const save = vi.fn().mockResolvedValue(undefined);
-	await showWhatsNewIfUpdated({} as never, s, version, changelog, save);
-	return save;
+function load(d: ReturnType<typeof device>, version: string, hadSavedData = true, showWhatsNew = true) {
+	showWhatsNewIfUpdated(d.app as never, { hadSavedData, showWhatsNew }, version, changelog);
 }
 
+afterEach(() => setApiVersion("1.13.1"));
+
 describe("What's new after an update", () => {
-	it("records the version silently on first install", async () => {
-		const s = settings();
-		const save = await load(s, "0.5.1");
+	it("records the version silently on a first install (no data.json, no marker)", () => {
+		const d = device();
+		load(d, "0.5.1", false);
 		expect(modal()).toBeNull();
-		expect(s.lastSeenVersion).toBe("0.5.1");
-		expect(save).toHaveBeenCalledTimes(1);
+		expect(d.marker()).toBe("0.5.1");
 	});
 
-	it("shows the notes since the last seen version once, then never again for that version", async () => {
-		const s = settings({ lastSeenVersion: "0.5.0" });
-		const save = await load(s, "0.5.1");
-		const root = modal()!;
-		expect(element(root, "h3").textContent).toBe("What's new in LiftOff 0.5.1");
-		expect(element(root, ".ln-whats-new-body").textContent).toBe("- Five one");
-		expect(s.lastSeenVersion).toBe("0.5.1");
-		expect(save).toHaveBeenCalledTimes(1);
-
-		click(root, ".ln-modal-buttons .mod-cta");
-		expect(root.isConnected).toBe(false);
-
-		const again = await load(s, "0.5.1");
-		expect(modal()).toBeNull();
-		expect(again).not.toHaveBeenCalled();
+	it("treats existing data without a marker as an upgrade and shows only the current notes", () => {
+		const d = device();
+		load(d, "0.5.1", true);
+		expect(element(modal()!, "h3").textContent).toBe("What's new in LiftOff 0.5.1");
+		expect(body()).toBe("- Five one");
+		expect(d.marker()).toBe("0.5.1");
 	});
 
-	it("caps a long gap at the three newest versions, each under its own heading", async () => {
-		const s = settings({ lastSeenVersion: "0.3.0" });
-		await load(s, "0.6.0");
-		const body = element(modal()!, ".ln-whats-new-body").textContent;
-		expect(body).toBe("### 0.6.0\n\n- Six\n\n### 0.5.1\n\n- Five one\n\n### 0.5.0\n\n- Five");
+	it("shows the notes since this device's marker once, then never again for that version", () => {
+		const d = device("0.5.0");
+		load(d, "0.5.1");
+		expect(body()).toBe("- Five one");
+		expect(d.marker()).toBe("0.5.1");
+		click(modal()!, ".ln-modal-buttons .mod-cta");
+		expect(modal()).toBeNull();
+
+		load(d, "0.5.1");
+		expect(modal()).toBeNull();
+	});
+
+	it("keeps the marker per device: a second device still gets its own window", () => {
+		const phone = device("0.5.0");
+		const laptop = device("0.5.0");
+		load(phone, "0.5.1");
 		click(modal()!, ".mod-cta");
+		load(laptop, "0.5.1");
+		expect(body()).toBe("- Five one");
+		expect(laptop.marker()).toBe("0.5.1");
 	});
 
-	it("records the version but shows nothing when the toggle is off", async () => {
-		const s = settings({ lastSeenVersion: "0.5.0", showWhatsNew: false });
-		const save = await load(s, "0.5.1");
-		expect(modal()).toBeNull();
-		expect(s.lastSeenVersion).toBe("0.5.1");
-		expect(save).toHaveBeenCalledTimes(1);
+	it("caps a long gap at the three newest versions, each under its own heading", () => {
+		load(device("0.3.0"), "0.6.0");
+		expect(body()).toBe("### 0.6.0\n\n- Six\n\n### 0.5.1\n\n- Five one\n\n### 0.5.0\n\n- Five");
 	});
 
-	it("does nothing on a downgrade", async () => {
-		const s = settings({ lastSeenVersion: "0.6.0" });
-		const save = await load(s, "0.5.1");
+	it("records the marker but shows nothing when the toggle is off", () => {
+		const d = device("0.5.0");
+		load(d, "0.5.1", true, false);
 		expect(modal()).toBeNull();
-		expect(s.lastSeenVersion).toBe("0.6.0");
-		expect(save).not.toHaveBeenCalled();
+		expect(d.marker()).toBe("0.5.1");
+	});
+
+	it("does nothing on a downgrade", () => {
+		const d = device("0.6.0");
+		load(d, "0.5.1");
+		expect(modal()).toBeNull();
+		expect(d.marker()).toBe("0.6.0");
+	});
+
+	it("skips everything on Obsidian versions without vault localStorage", () => {
+		setApiVersion("1.8.6");
+		const d = device();
+		const app = { loadLocalStorage: () => { throw new Error("missing"); }, saveLocalStorage: () => { throw new Error("missing"); } };
+		expect(() => showWhatsNewIfUpdated(app as never, { hadSavedData: true, showWhatsNew: true }, "0.5.1", changelog)).not.toThrow();
+		expect(modal()).toBeNull();
+		expect(d.marker()).toBeUndefined();
 	});
 });

@@ -74,8 +74,6 @@ export interface LiftOffSettings {
 	keepScreenAwake: boolean;
 	/** Open "What's new" after an update. */
 	showWhatsNew: boolean;
-	/** Internal: plugin version whose notes the user has seen. Absent until first load. */
-	lastSeenVersion?: string;
 	exerciseLibrary: ExerciseLibraryEntry[];
 }
 
