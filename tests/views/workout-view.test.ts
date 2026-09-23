@@ -5,6 +5,7 @@ import type LiftOffPlugin from "../../src/main";
 import { WorkoutView } from "../../src/views/workout-view";
 import { DEFAULT_SETTINGS, type Exercise, type Workout } from "../../src/types";
 import { DurationSetRow } from "../../src/components/duration-set-row";
+import { screenWakeLock } from "../../src/utils/wake-lock";
 import { click, element, exercise, input, menuAction, trackIntervals } from "../helpers/dom";
 
 const views: WorkoutView[] = [];
@@ -12,11 +13,17 @@ afterEach(async () => {
 	for (const view of views.splice(0)) await view.onClose();
 });
 
-function setup(exercises: Exercise[] = []) {
+function setup(exercises: Exercise[] = [], history: Workout[] = []) {
 	const plugin = {
-		settings: { ...DEFAULT_SETTINGS, exerciseLibrary: [] },
-		workoutStore: { getRecentWorkouts: vi.fn(() => []) },
+		settings: { ...DEFAULT_SETTINGS, holdBufferSeconds: 0, exerciseLibrary: [] },
+		workoutStore: {
+			getRecentWorkouts: vi.fn(() => history.map((_, i) => ({ path: String(i) }))),
+			parseWorkoutFile: vi.fn((path: string) => history[Number(path)] ?? null),
+			saveWorkout: vi.fn().mockResolvedValue(undefined),
+		},
 		persistActiveWorkout: vi.fn().mockResolvedValue(undefined),
+		clearActiveWorkout: vi.fn().mockResolvedValue(undefined),
+		showHomeView: vi.fn().mockResolvedValue(undefined),
 		saveSettings: vi.fn().mockResolvedValue(undefined),
 	};
 	const workout: Workout = {
@@ -163,6 +170,7 @@ describe("WorkoutView rest timer", () => {
 		click(owner!.getRootEl(), ".ln-set-check");
 		const rest = element(view.containerEl, ".ln-rest-timer");
 		const restId = tracking.ids().at(-1)!;
+		expect(screenWakeLock.held).toBe(1); // A running rest timer keeps the screen on
 		vi.advanceTimersByTime(2000);
 		menuAction(owner!.getRootEl(), "Move up");
 		expect(rest.previousElementSibling).toBe(owner!.getRootEl());
@@ -185,9 +193,14 @@ describe("WorkoutView rest timer", () => {
 		expect(rest.isConnected).toBe(false);
 		tracking.expectClearedOnce([restId]);
 		expect(vi.getTimerCount()).toBe(1); // Workout elapsed timer remains.
+		expect(screenWakeLock.held).toBe(0);
 		click(b!.getRootEl(), ".ln-set-check"); // Callback uses its new index.
 		expect(rest.previousElementSibling).toBe(b!.getRootEl());
+		click(b!.getRootEl(), ".ln-set-check");
+		click(b!.getRootEl(), ".ln-set-check"); // A restart still holds only once
+		expect(screenWakeLock.held).toBe(1);
 		click(rest, ".ln-rest-timer-dismiss");
+		expect(screenWakeLock.held).toBe(0);
 		tracking.expectClearedOnce([restId, tracking.ids().at(-1)!]);
 	});
 
@@ -207,6 +220,19 @@ describe("WorkoutView rest timer", () => {
 		vi.advanceTimersByTime(1000);
 		expect(element(rest, ".ln-rest-timer-value").textContent).toBe("0:03");
 		expect(vi.getTimerCount()).toBe(2);
+	});
+
+	it("lets the screen sleep after 10 minutes of rest while the rest timer keeps counting", () => {
+		const { view } = setup([exercise("A")]);
+		click(view["exerciseCards"][0]!.getRootEl(), ".ln-set-check");
+		vi.advanceTimersByTime(599_000);
+		expect(screenWakeLock.held).toBe(1);
+		vi.advanceTimersByTime(1000);
+		expect(screenWakeLock.held).toBe(0);
+		vi.advanceTimersByTime(5000);
+		expect(element(view.containerEl, ".ln-rest-timer-value").textContent).toBe("10:05");
+		click(view.containerEl, ".ln-rest-timer-dismiss");
+		expect(screenWakeLock.held).toBe(0);
 	});
 });
 
@@ -273,5 +299,107 @@ describe("WorkoutView teardown", () => {
 		view.unload();
 		expect(vi.getTimerCount()).toBe(0);
 		tracking.expectClearedOnce(tracking.ids());
+	});
+});
+
+async function finish(root: HTMLElement) {
+	click(root, ".ln-finish-btn");
+	click(document, ".modal .mod-cta");
+	for (let i = 0; i < 5; i++) await Promise.resolve();
+}
+
+describe("WorkoutView finish", () => {
+	it("keeps an exercise with a note even when none of its sets was completed", async () => {
+		const skipped = { ...exercise("Bench"), note: "skipped, shoulder pain" };
+		const done = exercise("Row");
+		const untouched = exercise("Curl");
+		const blankNote = { ...exercise("Dips"), note: "  \n" };
+		const { root, plugin } = setup([skipped, done, untouched, blankNote]);
+		click(root.querySelectorAll(".ln-exercise-card")[1]!, ".ln-set-check");
+		await finish(root);
+		expect(plugin.workoutStore.saveWorkout).toHaveBeenCalledTimes(1);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises.map((e) => [e.name, e.sets.length, e.note])).toEqual([
+			["Bench", 0, "skipped, shoulder pain"],
+			["Row", 1, undefined],
+		]);
+		expect(plugin.clearActiveWorkout).toHaveBeenCalledTimes(1);
+		// Saving copies — the live exercise still has its unfinished set
+		expect(skipped.sets).toHaveLength(1);
+	});
+
+	it("saves a workout that only has notes", async () => {
+		const { root, plugin } = setup([{ ...exercise("Bench"), note: "outlier: sick" }]);
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([expect.objectContaining({ name: "Bench", sets: [], note: "outlier: sick" })]);
+	});
+
+	it("still refuses to save with neither a completed set nor a note", async () => {
+		const { root, plugin } = setup([exercise("Bench"), { ...exercise("Row"), note: " " }]);
+		await finish(root);
+		expect(plugin.workoutStore.saveWorkout).not.toHaveBeenCalled();
+		expect(plugin.clearActiveWorkout).not.toHaveBeenCalled();
+	});
+
+	it("saves a never-run timer with its note but without its config", async () => {
+		const timer = { ...exercise("Tabata", "timer"), note: "ran out of time" };
+		const { root, plugin } = setup([timer]);
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: "ran out of time" }]);
+		// The live exercise keeps its config
+		expect(timer.workSeconds).toBe(40);
+	});
+});
+
+describe("WorkoutView history auto-fill", () => {
+	const history: Workout[] = [{
+		type: "workout", template: "Grip", date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
+		exercises: [{
+			name: "Farmer's Hold",
+			exerciseType: "duration",
+			sets: [
+				{ weight: 24, reps: 0, unit: "kg", completed: true, durationSeconds: 60 },
+				{ weight: 0, reps: 0, unit: "kg", completed: true, durationSeconds: 40 },
+			],
+		}],
+	}];
+
+	it("carries hold weight forward from a template start", () => {
+		const { view } = setup([], history);
+		view.startFromTemplate({
+			type: "workout-template", name: "Grip",
+			exercises: [{ name: "Farmer's Hold", targetSets: 2, exerciseType: "duration" }],
+		});
+		const card = view["exerciseCards"][0]!;
+		expect(card.getExercise().sets.map((s) => [s.weight, s.durationSeconds, s.completed])).toEqual([[24, 0, false], [0, 0, false]]);
+		const weights = Array.from(card.getRootEl().querySelectorAll<HTMLInputElement>(".ln-duration-weight"), (el) => el.value);
+		expect(weights).toEqual(["24", ""]);
+		expect(element(card.getRootEl(), ".ln-duration-previous").textContent).toBe("prev 1:00 @ 24 kg");
+	});
+
+	it("carries hold weight forward when the exercise is added mid-workout", () => {
+		const { view, root } = setup([], history);
+		add(root, "Farmer's Hold", "duration");
+		expect(view["exerciseCards"][0]!.getExercise().sets.map((s) => [s.weight, s.unit, s.durationSeconds]))
+			.toEqual([[24, "kg", 0], [0, "kg", 0]]);
+	});
+
+	it("is not hidden by a newer note-only session", () => {
+		const skipped: Workout = {
+			...history[0]!, date: "2026-09-22",
+			exercises: [{ name: "Farmer's Hold", exerciseType: "duration", note: "skipped, grip sore", sets: [] }],
+		};
+		const { view } = setup([], [skipped, ...history]);
+		view.startFromTemplate({
+			type: "workout-template", name: "Grip",
+			exercises: [{ name: "Farmer's Hold", targetSets: 2, exerciseType: "duration" }],
+		});
+		const card = view["exerciseCards"][0]!;
+		expect(card.getExercise().sets.map((s) => s.weight)).toEqual([24, 0]);
+		expect(element(card.getRootEl(), ".ln-duration-previous").textContent).toBe("prev 1:00 @ 24 kg");
+		expect(element(card.getRootEl(), ".ln-exercise-previous-note").textContent)
+			.toBe("Last note (2026-09-22): skipped, grip sore");
 	});
 });

@@ -84,6 +84,18 @@ export class ExerciseCard {
 
 		this.renderMenuButton(headerRight);
 
+		// Last session's note ("increase weight", "outlier: sick") — read-only
+		const previousNote = this.lastData?.note?.trim();
+		if (previousNote) {
+			// Dated when it is newer than the "Last:" session the hints come from
+			const noteDate = this.lastData?.noteDate;
+			const label = noteDate && noteDate !== this.lastData?.date ? `Last note (${noteDate})` : "Last note";
+			this.containerEl.createDiv({
+				cls: "ln-exercise-previous-note",
+				text: `${label}: ${previousNote}`,
+			});
+		}
+
 		// Exercise notes
 		const libraryEntry = this.settings.exerciseLibrary.find(
 			(e) => e.name.toLowerCase() === this.exercise.name.toLowerCase()
@@ -169,13 +181,10 @@ export class ExerciseCard {
 	}
 
 	private renderDurationSets(): void {
-		// Previous hint (longest hold in last session)
-		let prevBest: number | null = null;
-		if (this.lastData && this.lastData.sets.length > 0) {
-			for (const s of this.lastData.sets) {
-				const d = s.durationSeconds ?? 0;
-				if (d > (prevBest ?? 0)) prevBest = d;
-			}
+		// Previous hint fallback (longest hold in last session)
+		let prevBest: WorkoutSet | null = null;
+		for (const s of this.lastData?.sets ?? []) {
+			if ((s.durationSeconds ?? 0) > (prevBest?.durationSeconds ?? 0)) prevBest = s;
 		}
 
 		this.setsContainerEl = this.containerEl.createDiv({ cls: "ln-sets-container" });
@@ -189,10 +198,11 @@ export class ExerciseCard {
 			text: "+ Add hold",
 		});
 		addSetBtn.addEventListener("click", () => {
+			const lastSet = this.exercise.sets[this.exercise.sets.length - 1];
 			this.exercise.sets.push({
-				weight: 0,
+				weight: lastSet?.weight ?? 0,
 				reps: 0,
-				unit: this.settings.weightUnit,
+				unit: lastSet?.unit ?? this.settings.weightUnit,
 				completed: false,
 				durationSeconds: 0,
 			});
@@ -201,14 +211,13 @@ export class ExerciseCard {
 		});
 	}
 
-	private appendDurationSet(index: number, prevBest: number | null): void {
+	private appendDurationSet(index: number, prevBest: WorkoutSet | null): void {
 		const set = this.exercise.sets[index]!;
-		const previousSeconds = this.lastData?.sets[index]?.durationSeconds ?? prevBest;
 		const row = new DurationSetRow(
 			this.setsContainerEl,
 			index + 1,
 			set,
-			previousSeconds,
+			this.previousHold(index, prevBest),
 			{
 				// Rows survive removals, so resolve their position at callback time.
 				onSetChanged: (updatedSet) => {
@@ -233,14 +242,21 @@ export class ExerciseCard {
 					for (let j = i; j < this.setRows.length; j++) {
 						const remainingRow = this.setRows[j];
 						if (remainingRow instanceof DurationSetRow) {
-							remainingRow.updateSetNumber(j + 1, this.lastData?.sets[j]?.durationSeconds ?? prevBest);
+							remainingRow.updateSetNumber(j + 1, this.previousHold(j, prevBest));
 						}
 					}
 					this.notifyChanged();
 				},
-			}
+			},
+			{ bufferSeconds: this.settings.holdBufferSeconds, weightUnit: this.settings.weightUnit }
 		);
 		this.setRows.push(row);
+	}
+
+	/** Same-index hold from last session, else its longest hold. */
+	private previousHold(index: number, prevBest: WorkoutSet | null): WorkoutSet | null {
+		const previous = this.lastData?.sets[index];
+		return previous?.durationSeconds !== undefined ? previous : prevBest;
 	}
 
 	private renderTimer(): void {

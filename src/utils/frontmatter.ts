@@ -41,7 +41,10 @@ export function workoutToFrontmatter(workout: Workout): string {
 		}
 		if (exercise.exerciseType === "timer") {
 			lines.push(`    exerciseType: timer`);
-			lines.push(`    workSeconds: ${exercise.workSeconds ?? 0}`);
+			// A timer that was never run is saved for its note only — no config,
+			// so "timer config in a note" keeps meaning it was completed
+			if (exercise.workSeconds === undefined) continue;
+			lines.push(`    workSeconds: ${exercise.workSeconds}`);
 			lines.push(`    restSeconds: ${exercise.restSeconds ?? 0}`);
 			if ((exercise.transitionSeconds ?? 0) > 0) {
 				lines.push(`    transitionSeconds: ${exercise.transitionSeconds}`);
@@ -49,16 +52,20 @@ export function workoutToFrontmatter(workout: Workout): string {
 			lines.push(`    intervals: ${exercise.intervals ?? 0}`);
 		} else if (exercise.exerciseType === "duration") {
 			lines.push(`    exerciseType: duration`);
-			lines.push("    sets:");
+			lines.push(exercise.sets.length > 0 ? "    sets:" : "    sets: []");
 			for (const set of exercise.sets) {
 				const parts = [`durationSeconds: ${set.durationSeconds ?? 0}`];
+				// Weighted holds only — unweighted ones keep their original shape
+				if (set.weight > 0) {
+					parts.push(`weight: ${set.weight}`, `unit: ${set.unit}`);
+				}
 				if (set.setType && set.setType !== "working") {
 					parts.push(`setType: ${set.setType}`);
 				}
 				lines.push(`      - { ${parts.join(", ")} }`);
 			}
 		} else {
-			lines.push("    sets:");
+			lines.push(exercise.sets.length > 0 ? "    sets:" : "    sets: []");
 			for (const set of exercise.sets) {
 				const parts = [
 					`weight: ${set.weight}`,
@@ -105,22 +112,32 @@ export function workoutToMarkdownBody(workout: Workout): string {
 			// Blank line so the table below isn't lazily absorbed into the blockquote
 			lines.push("");
 		}
-		if (exercise.exerciseType === "timer") {
+		if (exercise.exerciseType === "timer" && exercise.workSeconds === undefined) {
+			lines.push("_Not started._");
+		} else if (exercise.exerciseType === "timer") {
 			const w = formatTime(exercise.workSeconds ?? 0);
 			const r = formatTime(exercise.restSeconds ?? 0);
 			const t = exercise.transitionSeconds ?? 0;
 			const n = exercise.intervals ?? 0;
 			const switchPart = t > 0 ? ` / ${formatTime(t)} switch` : "";
 			lines.push(`Intervals: ${n} \u00D7 ${w} work / ${r} rest${switchPart}`);
+		} else if (exercise.sets.length === 0) {
+			// Kept for its note only
+			lines.push("_No sets completed._");
 		} else if (exercise.exerciseType === "duration") {
-			lines.push("| Set | Time |");
-			lines.push("|-----|------|");
+			const weighted = exercise.sets.some((set) => set.weight > 0);
+			lines.push(weighted ? "| Set | Time | Weight |" : "| Set | Time |");
+			lines.push(weighted ? "|-----|------|--------|" : "|-----|------|");
 			exercise.sets.forEach((set, i) => {
 				const typeSuffix = SET_TYPE_BODY_LABEL[effectiveSetType(set)] ?? "";
 				const setLabel = `${i + 1}${typeSuffix}`;
-				lines.push(
-					`| ${setLabel.padEnd(3)} | ${formatTime(set.durationSeconds ?? 0).padEnd(4)} |`
-				);
+				const row = `| ${setLabel.padEnd(3)} | ${formatTime(set.durationSeconds ?? 0).padEnd(4)} |`;
+				if (!weighted) {
+					lines.push(row);
+					return;
+				}
+				const weightStr = set.weight > 0 ? `${set.weight} ${set.unit}` : "BW";
+				lines.push(`${row} ${weightStr.padEnd(6)} |`);
 			});
 		} else {
 			lines.push("| Set | Weight | Reps |");

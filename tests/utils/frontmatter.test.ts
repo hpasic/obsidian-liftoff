@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { workoutToFrontmatter, workoutToMarkdownBody } from "../../src/utils/frontmatter";
+import { workoutToFrontmatter, workoutToFullMarkdown, workoutToMarkdownBody } from "../../src/utils/frontmatter";
 import type { Workout } from "../../src/types";
 
 const sampleWorkout: Workout = {
@@ -169,6 +169,64 @@ describe("duration exercise serialization", () => {
 		expect(result).toContain("1:15");
 		expect(result).not.toContain("Weight");
 	});
+
+	it("keeps unweighted holds byte-identical to the pre-weight format", () => {
+		const unweighted: Workout = {
+			...durationWorkout,
+			exercises: [{
+				...durationWorkout.exercises[0]!,
+				// Settings unit is irrelevant for 0 weight and must not leak into the note
+				sets: [
+					{ weight: 0, reps: 0, unit: "lbs", completed: true, durationSeconds: 60, setType: "warmup" },
+					{ weight: 0, reps: 0, unit: "kg", completed: true, durationSeconds: 75 },
+				],
+			}],
+		};
+		expect(workoutToFullMarkdown(unweighted)).toBe([
+			"---",
+			"type: workout",
+			'date: "2026-05-25"',
+			'start: "10:00"',
+			'end: "10:20"',
+			"duration: 20",
+			"exercises:",
+			"  - name: Plank",
+			"    exerciseType: duration",
+			"    sets:",
+			"      - { durationSeconds: 60, setType: warmup }",
+			"      - { durationSeconds: 75 }",
+			"---",
+			"# Workout — May 25, 2026",
+			"",
+			"## Plank",
+			"| Set | Time |",
+			"|-----|------|",
+			"| 1 (W) | 1:00 |",
+			"| 2   | 1:15 |",
+			"",
+		].join("\n"));
+	});
+
+	it("writes weight and unit only on weighted holds and adds a Weight column", () => {
+		const weighted: Workout = {
+			...durationWorkout,
+			exercises: [{
+				...durationWorkout.exercises[0]!,
+				name: "Farmer's Hold",
+				sets: [
+					{ weight: 20, reps: 0, unit: "kg", completed: true, durationSeconds: 60 },
+					{ weight: 0, reps: 0, unit: "kg", completed: true, durationSeconds: 45, setType: "failure" },
+				],
+			}],
+		};
+		const fm = workoutToFrontmatter(weighted);
+		expect(fm).toContain("      - { durationSeconds: 60, weight: 20, unit: kg }");
+		expect(fm).toContain("      - { durationSeconds: 45, setType: failure }");
+		const body = workoutToMarkdownBody(weighted);
+		expect(body).toContain("| Set | Time | Weight |\n|-----|------|--------|");
+		expect(body).toContain("| 1   | 1:00 | 20 kg  |");
+		expect(body).toContain("| 2 (failure) | 0:45 | BW     |");
+	});
 });
 
 describe("exercise note serialization", () => {
@@ -240,5 +298,53 @@ describe("setType serialization", () => {
 		const result = workoutToMarkdownBody(w);
 		expect(result).toContain("1 (W)");
 		expect(result).toContain("3 (drop)");
+	});
+});
+
+describe("note-only exercises (no completed sets)", () => {
+	const noteOnly: Workout = {
+		type: "workout", template: null, date: "2026-09-23", start: "18:00", end: "18:30", duration: 30,
+		exercises: [
+			{ name: "Bench Press", note: "skipped, shoulder pain", sets: [] },
+			{ name: "Plank", exerciseType: "duration", note: "outlier: sick", sets: [] },
+		],
+	};
+
+	it("writes an explicit empty set list in frontmatter", () => {
+		const fm = workoutToFrontmatter(noteOnly);
+		expect(fm).toContain('  - name: Bench Press\n    note: "skipped, shoulder pain"\n    sets: []\n');
+		expect(fm).toContain('    note: "outlier: sick"\n    exerciseType: duration\n    sets: []\n');
+	});
+
+	it("renders the note and a no-sets line instead of an empty table", () => {
+		const body = workoutToMarkdownBody(noteOnly);
+		expect(body).toContain("## Bench Press\n> skipped, shoulder pain\n\n_No sets completed._");
+		expect(body).toContain("## Plank\n> outlier: sick\n\n_No sets completed._");
+		expect(body).not.toContain("| Set |");
+	});
+});
+
+describe("not-started timer (note only)", () => {
+	const notStarted: Workout = {
+		type: "workout", template: null, date: "2026-09-23", start: "18:00", end: "18:30", duration: 30,
+		exercises: [{ name: "Tabata", exerciseType: "timer", note: "ran out of time", sets: [] }],
+	};
+
+	it("keeps type and note but no timer config, and says it was not started", () => {
+		const fm = workoutToFrontmatter(notStarted);
+		expect(fm).toContain('  - name: Tabata\n    note: "ran out of time"\n    exerciseType: timer\n---');
+		expect(fm).not.toMatch(/workSeconds|restSeconds|intervals/);
+		const body = workoutToMarkdownBody(notStarted);
+		expect(body).toContain("## Tabata\n> ran out of time\n\n_Not started._");
+		expect(body).not.toContain("Intervals:");
+	});
+
+	it("leaves a completed timer's output unchanged", () => {
+		expect(workoutToFrontmatter(timerWorkout)).toBe([
+			"---", "type: workout", "template: HIIT", 'date: "2026-03-21"', 'start: "07:00"', 'end: "07:30"',
+			"duration: 30", "exercises:", "  - name: Burpees", "    exerciseType: timer", "    workSeconds: 40",
+			"    restSeconds: 20", "    intervals: 5", "---",
+		].join("\n"));
+		expect(workoutToMarkdownBody(timerWorkout)).toContain("## Burpees\nIntervals: 5 \u00D7 0:40 work / 0:20 rest");
 	});
 });

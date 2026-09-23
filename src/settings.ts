@@ -57,6 +57,16 @@ export class LiftOffSettingTab extends PluginSettingTab {
 				control: { type: "number", key: "defaultRestDuration", placeholder: "90", min: 1, step: 1 },
 			},
 			{
+				name: "Hold buffer",
+				desc: "Seconds to get into and out of a hold: counted down before the hold clock starts and subtracted when you stop it. Set to 0 to turn it off.",
+				control: { type: "number", key: "holdBufferSeconds", placeholder: "5", min: 0, max: 60, step: 1 },
+			},
+			{
+				name: "Keep screen awake",
+				desc: "Stop the screen from turning off while a timer, hold, or rest timer is running",
+				control: { type: "toggle", key: "keepScreenAwake" },
+			},
+			{
 				type: "group",
 				heading: "Timer exercises",
 				items: [
@@ -121,6 +131,16 @@ export class LiftOffSettingTab extends PluginSettingTab {
 				settings[key] = num;
 				break;
 			}
+			case "holdBufferSeconds": {
+				const num = typeof value === "number" ? Math.floor(value) : NaN;
+				if (!Number.isFinite(num) || num < 0 || num > 60) return;
+				settings.holdBufferSeconds = num;
+				break;
+			}
+			case "keepScreenAwake":
+				if (typeof value !== "boolean") return;
+				settings.keepScreenAwake = value;
+				break;
 			default:
 				return;
 		}
@@ -203,6 +223,32 @@ export class LiftOffSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}
 					})
+			);
+
+		new Setting(containerEl)
+			.setName("Hold buffer")
+			.setDesc("Seconds to get into and out of a hold: counted down before the hold clock starts and subtracted when you stop it. Set to 0 to turn it off.")
+			.addText((text) =>
+				text
+					.setPlaceholder("5")
+					.setValue(String(this.plugin.settings.holdBufferSeconds))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 0 && num <= 60) {
+							this.plugin.settings.holdBufferSeconds = num;
+							await this.plugin.saveSettings();
+						}
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Keep screen awake")
+			.setDesc("Stop the screen from turning off while a timer, hold, or rest timer is running")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.keepScreenAwake).onChange(async (value) => {
+					this.plugin.settings.keepScreenAwake = value;
+					await this.plugin.saveSettings();
+				})
 			);
 
 		new Setting(containerEl).setName("Timer exercises").setHeading();

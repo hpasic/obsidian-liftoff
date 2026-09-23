@@ -47,6 +47,9 @@ export function installObsidianDom(): void {
 }
 
 export class Plugin {}
+export class TFile { path = ""; basename = ""; extension = "md"; name = ""; }
+export class TFolder { path = ""; children: unknown[] = []; }
+export function normalizePath(path: string): string { return path; }
 export class PluginSettingTab {}
 
 export class ItemView {

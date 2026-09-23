@@ -11,8 +11,12 @@ import { remapIndexAfterRemoval, remapIndexAfterSwap } from "../utils/reorder";
 import { computeBests } from "../utils/sets";
 import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
 import { formatLocalDate } from "../utils/date";
+import { WakeLockClaim } from "../utils/wake-lock";
 
 export const WORKOUT_VIEW_TYPE = "liftoff-workout";
+
+/** The rest timer counts up until dismissed; after this long the screen may sleep again. */
+const REST_WAKE_LOCK_LIMIT_SECONDS = 10 * 60;
 
 export class WorkoutView extends ItemView {
 	private plugin: LiftOffPlugin;
@@ -25,6 +29,7 @@ export class WorkoutView extends ItemView {
 	private restStartTime: number | null = null;
 	private restTimerEl: HTMLElement | null = null;
 	private activeRestExerciseIndex: number | null = null;
+	private readonly restWakeLock = new WakeLockClaim();
 	private recentWorkouts: Workout[] = [];
 	private initialized = false;
 	/** Parent of the exercise cards — structural ops append/reorder into it directly. */
@@ -344,6 +349,7 @@ export class WorkoutView extends ItemView {
 
 		this.restStartTime = Date.now();
 		this.activeRestExerciseIndex = exerciseIndex;
+		this.restWakeLock.hold();
 
 		this.mountRestTimerAt(exerciseIndex);
 
@@ -356,6 +362,8 @@ export class WorkoutView extends ItemView {
 		this.restTimerIntervalId = window.setInterval(() => {
 			if (!this.restStartTime || !this.restTimerEl) return;
 			const elapsed = Math.floor((Date.now() - this.restStartTime) / 1000);
+			// Keep counting, but stop holding the screen on after the last set
+			if (elapsed >= REST_WAKE_LOCK_LIMIT_SECONDS) this.restWakeLock.drop();
 			const m = Math.floor(elapsed / 60);
 			const s = elapsed % 60;
 			const valueEl = this.restTimerEl.querySelector(".ln-rest-timer-value") as HTMLElement;
@@ -377,6 +385,7 @@ export class WorkoutView extends ItemView {
 		}
 		this.restStartTime = null;
 		this.activeRestExerciseIndex = null;
+		this.restWakeLock.drop();
 		if (this.restTimerEl) {
 			this.restTimerEl.addClass("ln-rest-timer-hidden");
 			this.restTimerEl.remove();
@@ -429,13 +438,17 @@ export class WorkoutView extends ItemView {
 			newExercise = {
 				name,
 				exerciseType,
-				sets: Array.from({ length: seedCount }, () => ({
-					weight: 0,
-					reps: 0,
-					unit: this.plugin.settings.weightUnit,
-					completed: false,
-					durationSeconds: 0,
-				})),
+				// Weighted holds carry their weight forward; the time starts fresh
+				sets: Array.from({ length: seedCount }, (_, i) => {
+					const prev = lastData?.sets[i];
+					return {
+						weight: prev?.weight ?? 0,
+						reps: 0,
+						unit: prev && prev.weight > 0 ? prev.unit : this.plugin.settings.weightUnit,
+						completed: false,
+						durationSeconds: 0,
+					};
+				}),
 			};
 		} else {
 			newExercise = {
@@ -538,14 +551,23 @@ export class WorkoutView extends ItemView {
 		if (!confirmed) return;
 
 		// Copy rather than mutate: cards hold live references to these exercises,
-		// and the live workout must survive a failed save untouched
+		// and the live workout must survive a failed save untouched.
+		// An exercise with a note but no completed set is kept so the note
+		// ("skipped, shoulder pain") shows up next session.
 		const collected = this.collectWorkout();
 		const completedExercises = collected.exercises
-			.filter((e) => e.sets.some((s) => s.completed))
-			.map((e) => ({ ...e, sets: e.sets.filter((s) => s.completed) }));
+			.filter((e) => e.sets.some((s) => s.completed) || !!e.note?.trim())
+			.map((e): Exercise => {
+				const sets = e.sets.filter((s) => s.completed);
+				if (e.exerciseType === "timer" && sets.length === 0) {
+					// Never run: drop the config so the note can't pass for a completed timer
+					return { name: e.name, exerciseType: "timer", sets, note: e.note };
+				}
+				return { ...e, sets };
+			});
 
 		if (completedExercises.length === 0) {
-			new Notice("No completed sets to save.");
+			new Notice("No completed sets or notes to save.");
 			return;
 		}
 
