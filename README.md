@@ -14,16 +14,17 @@ Mobile-first gym workout tracker for [Obsidian](https://obsidian.md). Log sets, 
 - Tag sets as warmup, working, drop, or failure — just tap the set number to cycle
 - Automatic personal-record detection with a 🏆 badge the moment you beat a best
 - Post-workout summary appended to every note: duration, working sets, total volume, and PRs
-- Duration exercises — a count-up stopwatch for planks, dead hangs, and L-sits
+- Duration exercises — a count-up stopwatch for planks, dead hangs, and L-sits, with a get-set buffer and optional added weight
 - Built-in rest timer with auto-start, plus an interval timer for HIIT
-- Free-text notes per exercise
+- Free-text notes per exercise, shown again next session
+- Keeps the screen awake while a timer is running
 - Exercise library with search, backed by a built-in catalog of 1,300+ exercises
 - Workout history stored as plain markdown files
 - Works great on mobile
 
 ### Workout tracking
 
-Log sets with weight and reps. Previous session data is pre-filled so you can pick up where you left off. Tap the set number to cycle its type — **W**armup, working, **D**rop, or **F**ailure — and warmups and drop sets are automatically excluded from volume and PR calculations. Add a free-text note to any exercise to capture how it felt.
+Log sets with weight and reps. Previous session data is pre-filled so you can pick up where you left off. Tap the set number to cycle its type — **W**armup, working, **D**rop, or **F**ailure — and warmups and drop sets are automatically excluded from volume and PR calculations. Add a free-text note to any exercise to capture how it felt. Next session, that note appears under the exercise name, so "increase weight next time" is right where you need it. An exercise with a note is saved even if you completed no sets.
 
 ![Active workout](screenshots/workout-active.png)
 
@@ -47,6 +48,10 @@ Every saved workout gets a `## Summary` section with total duration, working-set
 
 A built-in rest timer with preset durations, an interval timer for HIIT-style work/rest sets, and count-up duration holds for static exercises like planks, dead hangs, and L-sits.
 
+Starting a hold first counts down a short get-set buffer (5 seconds by default) so you can get into position. The same buffer is subtracted when you stop, covering the time it takes to get back to your phone, so the saved time is the hold itself. Enter an added weight on a hold for loaded carries and weighted planks; leave it empty for bodyweight.
+
+While any timer, hold, or rest timer is running, LiftOff keeps the screen from turning off.
+
 <p align="center">
   <img src="screenshots/rest-timer.png" width="400" alt="Rest timer with preset durations" />
   <img src="screenshots/interval-timer-running.png" width="400" alt="Interval timer during work phase" />
@@ -66,7 +71,7 @@ Adding an exercise searches your own library and a built-in catalog of 1,300+ ex
 
 ### Settings
 
-Configure workout and template folders, default weight unit, and rest timer presets.
+Configure workout and template folders, default weight unit, rest timer presets, the hold buffer (set it to 0 to turn it off), and whether to keep the screen awake while timers run.
 
 ![Settings](screenshots/settings.png)
 
