@@ -6,15 +6,17 @@ export class TemplateEditorModal extends Modal {
 	private template: WorkoutTemplate;
 	private library: ExerciseLibraryEntry[];
 	private recentNames: string[];
-	private onSave: (template: WorkoutTemplate) => void;
+	private onSave: (template: WorkoutTemplate, catalogNames: Set<string>) => void;
 	private listEl: HTMLElement = null!;
+	/** Lower-cased names picked from the built-in catalog, for the library on save. */
+	private catalogNames = new Set<string>();
 
 	constructor(
 		app: App,
 		template: WorkoutTemplate,
 		library: ExerciseLibraryEntry[],
 		recentNames: string[],
-		onSave: (template: WorkoutTemplate) => void
+		onSave: (template: WorkoutTemplate, catalogNames: Set<string>) => void
 	) {
 		super(app);
 		this.template = {
@@ -45,7 +47,8 @@ export class TemplateEditorModal extends Modal {
 				this.app,
 				this.library,
 				this.recentNames,
-				(name, exerciseType) => {
+				(name, exerciseType, source) => {
+					if (source === "catalog") this.catalogNames.add(name.toLowerCase());
 					this.template.exercises.push({
 						name,
 						targetSets: 3,
@@ -61,7 +64,7 @@ export class TemplateEditorModal extends Modal {
 			text: "Save template",
 		});
 		saveBtn.addEventListener("click", () => {
-			this.onSave(this.template);
+			this.onSave(this.template, this.catalogNames);
 			this.close();
 		});
 	}

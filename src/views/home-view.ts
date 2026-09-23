@@ -3,6 +3,7 @@ import type LiftOffPlugin from "../main";
 import type { WorkoutTemplate } from "../types";
 import { TextInputModal, ConfirmModal } from "../components/modals";
 import { TemplateEditorModal } from "../components/template-editor";
+import { addTemplateExercisesToLibrary } from "../utils/library";
 import { ExerciseLibraryModal } from "../components/exercise-library";
 
 export const HOME_VIEW_TYPE = "liftoff-home";
@@ -288,21 +289,15 @@ export class HomeView extends ItemView {
 			template,
 			this.plugin.settings.exerciseLibrary,
 			[],
-			(updated) => {
+			(updated, catalogNames) => {
 				void (async () => {
 					// Template first: a failed template write must not grow the library
 					await this.plugin.templateStore.saveTemplate(updated);
-					const library = this.plugin.settings.exerciseLibrary;
-					for (const ex of updated.exercises) {
-						const existing = library.find(
-							(e) => e.name.toLowerCase() === ex.name.toLowerCase()
-						);
-						if (!existing) {
-							library.push({ name: ex.name, exerciseType: ex.exerciseType });
-						} else if (!existing.exerciseType && ex.exerciseType) {
-							existing.exerciseType = ex.exerciseType;
-						}
-					}
+					addTemplateExercisesToLibrary(
+						this.plugin.settings.exerciseLibrary,
+						updated.exercises,
+						catalogNames
+					);
 					await this.plugin.saveSettings();
 					new Notice(`Template "${updated.name}" saved.`);
 					await this.renderHome();
