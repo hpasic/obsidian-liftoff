@@ -24,7 +24,7 @@ describe("hold buffer setting", () => {
 
 	it("declares the same bounds to the settings UI", () => {
 		const { tab } = setup();
-		const item = tab.getSettingDefinitions().find((d) => "control" in d && d.control.key === "holdBufferSeconds");
+		const item = tab.getSettingDefinitions().find((d) => "control" in d && d.control?.key === "holdBufferSeconds");
 		expect(item).toMatchObject({ control: { type: "number", min: 0, max: 60 } });
 	});
 });
