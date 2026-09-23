@@ -1,7 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "module";
-import { readFileSync } from "fs";
+import { readInlinedChangelog } from "./scripts/inline-changelog.mjs";
 
 // Release assets are only main.js/manifest.json/styles.css, so the bundled
 // exercise catalog's MIT notice has to ride along in the banner — it is the
@@ -42,9 +42,10 @@ const prod = process.argv[2] === "production";
 
 const context = await esbuild.context({
 	banner: { js: banner },
-	// "What's new" notes come straight from CHANGELOG.md — nothing generated is committed.
-	// Read once per build; restart `npm run dev` to pick up changelog edits.
-	define: { LIFTOFF_CHANGELOG: JSON.stringify(readFileSync("CHANGELOG.md", "utf8")) },
+	// "What's new" notes come straight from CHANGELOG.md (newest sections only) —
+	// nothing generated is committed. Read once per build; restart `npm run dev`
+	// to pick up changelog edits.
+	define: { LIFTOFF_CHANGELOG: JSON.stringify(readInlinedChangelog()) },
 	entryPoints: ["src/main.ts"],
 	bundle: true,
 	external: [

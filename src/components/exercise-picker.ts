@@ -22,6 +22,8 @@ function makeActivatable(el: HTMLElement, activate: () => void): void {
 	el.addEventListener("keydown", (evt) => {
 		if (evt.key !== "Enter" && evt.key !== " ") return;
 		evt.preventDefault(); // Space would scroll the results
+		// Holding the key down must not toggle a chip over and over
+		if (evt.repeat) return;
 		activate();
 	});
 }

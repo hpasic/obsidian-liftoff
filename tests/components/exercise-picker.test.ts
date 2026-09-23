@@ -110,8 +110,8 @@ describe("ExercisePickerModal catalog", () => {
 	});
 });
 
-function press(el: HTMLElement, key: string): KeyboardEvent {
-	const evt = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+function press(el: HTMLElement, key: string, repeat = false): KeyboardEvent {
+	const evt = new KeyboardEvent("keydown", { key, repeat, bubbles: true, cancelable: true });
 	el.dispatchEvent(evt);
 	return evt;
 }
@@ -165,6 +165,18 @@ describe("ExercisePickerModal keyboard access", () => {
 		input(third.root, ".ln-exercise-search", "odd lift");
 		press(element(third.root, ".ln-exercise-create-timer"), "Enter");
 		expect(third.onSelect).toHaveBeenLastCalledWith("odd lift", "timer");
+	});
+
+	it("ignores auto-repeat while a key is held on a chip", () => {
+		const { root } = openPicker();
+		const chip = element(root, ".ln-picker-chip");
+		const bodyPart = chip.textContent;
+		chip.focus();
+		press(chip, "Enter");
+		const active = element(root, ".ln-picker-chip-active");
+		for (let i = 0; i < 5; i++) expect(press(active, "Enter", true).defaultPrevented).toBe(true);
+		expect(element(root, ".ln-picker-chip-active").textContent).toBe(bodyPart);
+		expect(sectionLabels(root)).toEqual(["Catalog"]);
 	});
 });
 

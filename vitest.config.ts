@@ -1,10 +1,10 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { readInlinedChangelog } from "./scripts/inline-changelog.mjs";
 
 export default defineConfig({
 	// Same injection as esbuild.config.mjs
-	define: { LIFTOFF_CHANGELOG: JSON.stringify(readFileSync("CHANGELOG.md", "utf8")) },
+	define: { LIFTOFF_CHANGELOG: JSON.stringify(readInlinedChangelog()) },
 	test: {
 		include: ["tests/**/*.test.ts"],
 	},

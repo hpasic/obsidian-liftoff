@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { compareVersions, findSection, parseChangelog, sectionsSince } from "../../src/utils/changelog";
+import { readInlinedChangelog, selectInlinedChangelog } from "../../scripts/inline-changelog.mjs";
 
 const changelog = readFileSync("CHANGELOG.md", "utf8");
 const manifest = JSON.parse(readFileSync("manifest.json", "utf8")) as { version: string };
@@ -73,8 +74,12 @@ describe("CHANGELOG.md", () => {
 		expect(versions).toEqual([...versions].sort((a, b) => compareVersions(b, a)));
 	});
 
-	it("is what the plugin build inlines", () => {
-		expect(LIFTOFF_CHANGELOG).toBe(changelog);
+	it("is what the plugin build inlines: its newest three sections, unchanged", () => {
+		const inlined = readInlinedChangelog();
+		expect(LIFTOFF_CHANGELOG).toBe(inlined);
+		const newest = parseChangelog(changelog)
+			.sort((a, b) => compareVersions(b.version, a.version)).slice(0, 3);
+		expect(parseChangelog(inlined)).toEqual(newest);
 	});
 });
 
@@ -94,3 +99,13 @@ describe("scripts/changelog-notes.mjs", () => {
 		expect(result.stderr).toContain("99.0.0");
 	});
 });
+
+describe("selectInlinedChangelog", () => {
+	it("keeps only the newest sections, highest version first, dropping the intro", () => {
+		const inlined = selectInlinedChangelog(sample, 2);
+		expect(inlined).toBe("## 0.10.0 - 2026-10-01\n\n- Ten\n\n## 0.9.0 - 2026-09-30\n\n- Nine\n- More nine\n");
+		expect(inlined).not.toContain("Intro");
+		expect(parseChangelog(selectInlinedChangelog(sample)).map((s) => s.version)).toEqual(["0.10.0", "0.9.0", "0.8.0"]);
+	});
+});
+

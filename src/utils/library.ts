@@ -3,8 +3,8 @@ import type { ExerciseLibraryEntry, TemplateExercise } from "../types";
 /**
  * Add a saved template's exercises to the library. `catalogNames` (lower-cased)
  * are the ones picked from the built-in catalog: new entries get
- * `source: "catalog"`, as in the workout view, and an existing entry without a
- * source adopts it.
+ * `source: "catalog"`, as in the workout view. An existing entry's source is
+ * never changed — absent means user-created.
  */
 export function addTemplateExercisesToLibrary(
 	library: ExerciseLibraryEntry[],
@@ -20,9 +20,6 @@ export function addTemplateExercisesToLibrary(
 		}
 		if (!existing.exerciseType && ex.exerciseType) {
 			existing.exerciseType = ex.exerciseType;
-		}
-		if (source && !existing.source) {
-			existing.source = source;
 		}
 	}
 }

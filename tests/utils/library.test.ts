@@ -16,7 +16,7 @@ describe("addTemplateExercisesToLibrary", () => {
 		expect(JSON.parse(JSON.stringify(library))[1]).toEqual({ name: "My row" });
 	});
 
-	it("gives an existing sourceless entry the catalog source, never takes one away", () => {
+	it("never changes an existing entry's source, as in the workout view", () => {
 		const library: ExerciseLibraryEntry[] = [
 			{ name: "barbell bench press" },
 			{ name: "Burpee", exerciseType: "duration", source: "catalog" },
@@ -26,7 +26,7 @@ describe("addTemplateExercisesToLibrary", () => {
 			{ name: "Burpee", targetSets: 3, exerciseType: "timer" },
 		], new Set(["barbell bench press"]));
 		expect(library).toEqual([
-			{ name: "barbell bench press", source: "catalog" },
+			{ name: "barbell bench press" },
 			{ name: "Burpee", exerciseType: "duration", source: "catalog" },
 		]);
 	});
