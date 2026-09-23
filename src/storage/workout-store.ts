@@ -10,6 +10,11 @@ function parseSetType(value: unknown): SetType | undefined {
 	return SET_TYPES.find((t) => t === value);
 }
 
+/** Note-only entries don't count: at least one set, or a timer that was run. */
+function loggedSomething(ex: Record<string, unknown>): boolean {
+	return (Array.isArray(ex.sets) && ex.sets.length > 0) || ex.workSeconds !== undefined;
+}
+
 export interface RecentWorkout {
 	filename: string;
 	path: string;
@@ -63,7 +68,9 @@ export class WorkoutStore {
 				template: (fm.template as string) ?? null,
 				date: (fm.date as string) ?? file.basename.substring(0, 10),
 				duration: (fm.duration as number) ?? null,
-				exerciseCount: Array.isArray(fm.exercises) ? (fm.exercises as unknown[]).length : 0,
+				exerciseCount: Array.isArray(fm.exercises)
+					? (fm.exercises as Array<Record<string, unknown>>).filter(loggedSomething).length
+					: 0,
 			});
 		}
 
@@ -84,6 +91,11 @@ export class WorkoutStore {
 			for (const ex of fm.exercises as Array<Record<string, unknown>>) {
 				const note = typeof ex.note === "string" ? ex.note : undefined;
 				if (ex.exerciseType === "timer") {
+					if (ex.workSeconds === undefined) {
+						// Saved for its note only — never run
+						exercises.push({ name: String(ex.name), exerciseType: "timer", sets: [], note });
+						continue;
+					}
 					exercises.push({
 						name: String(ex.name),
 						exerciseType: "timer",

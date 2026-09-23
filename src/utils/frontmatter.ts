@@ -41,7 +41,10 @@ export function workoutToFrontmatter(workout: Workout): string {
 		}
 		if (exercise.exerciseType === "timer") {
 			lines.push(`    exerciseType: timer`);
-			lines.push(`    workSeconds: ${exercise.workSeconds ?? 0}`);
+			// A timer that was never run is saved for its note only — no config,
+			// so "timer config in a note" keeps meaning it was completed
+			if (exercise.workSeconds === undefined) continue;
+			lines.push(`    workSeconds: ${exercise.workSeconds}`);
 			lines.push(`    restSeconds: ${exercise.restSeconds ?? 0}`);
 			if ((exercise.transitionSeconds ?? 0) > 0) {
 				lines.push(`    transitionSeconds: ${exercise.transitionSeconds}`);
@@ -109,7 +112,9 @@ export function workoutToMarkdownBody(workout: Workout): string {
 			// Blank line so the table below isn't lazily absorbed into the blockquote
 			lines.push("");
 		}
-		if (exercise.exerciseType === "timer") {
+		if (exercise.exerciseType === "timer" && exercise.workSeconds === undefined) {
+			lines.push("_Not started._");
+		} else if (exercise.exerciseType === "timer") {
 			const w = formatTime(exercise.workSeconds ?? 0);
 			const r = formatTime(exercise.restSeconds ?? 0);
 			const t = exercise.transitionSeconds ?? 0;

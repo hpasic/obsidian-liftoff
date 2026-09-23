@@ -221,6 +221,19 @@ describe("WorkoutView rest timer", () => {
 		expect(element(rest, ".ln-rest-timer-value").textContent).toBe("0:03");
 		expect(vi.getTimerCount()).toBe(2);
 	});
+
+	it("lets the screen sleep after 10 minutes of rest while the rest timer keeps counting", () => {
+		const { view } = setup([exercise("A")]);
+		click(view["exerciseCards"][0]!.getRootEl(), ".ln-set-check");
+		vi.advanceTimersByTime(599_000);
+		expect(screenWakeLock.held).toBe(1);
+		vi.advanceTimersByTime(1000);
+		expect(screenWakeLock.held).toBe(0);
+		vi.advanceTimersByTime(5000);
+		expect(element(view.containerEl, ".ln-rest-timer-value").textContent).toBe("10:05");
+		click(view.containerEl, ".ln-rest-timer-dismiss");
+		expect(screenWakeLock.held).toBe(0);
+	});
 });
 
 describe("WorkoutView teardown", () => {
@@ -328,6 +341,16 @@ describe("WorkoutView finish", () => {
 		expect(plugin.workoutStore.saveWorkout).not.toHaveBeenCalled();
 		expect(plugin.clearActiveWorkout).not.toHaveBeenCalled();
 	});
+
+	it("saves a never-run timer with its note but without its config", async () => {
+		const timer = { ...exercise("Tabata", "timer"), note: "ran out of time" };
+		const { root, plugin } = setup([timer]);
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: "ran out of time" }]);
+		// The live exercise keeps its config
+		expect(timer.workSeconds).toBe(40);
+	});
 });
 
 describe("WorkoutView history auto-fill", () => {
@@ -361,5 +384,22 @@ describe("WorkoutView history auto-fill", () => {
 		add(root, "Farmer's Hold", "duration");
 		expect(view["exerciseCards"][0]!.getExercise().sets.map((s) => [s.weight, s.unit, s.durationSeconds]))
 			.toEqual([[24, "kg", 0], [0, "kg", 0]]);
+	});
+
+	it("is not hidden by a newer note-only session", () => {
+		const skipped: Workout = {
+			...history[0]!, date: "2026-09-22",
+			exercises: [{ name: "Farmer's Hold", exerciseType: "duration", note: "skipped, grip sore", sets: [] }],
+		};
+		const { view } = setup([], [skipped, ...history]);
+		view.startFromTemplate({
+			type: "workout-template", name: "Grip",
+			exercises: [{ name: "Farmer's Hold", targetSets: 2, exerciseType: "duration" }],
+		});
+		const card = view["exerciseCards"][0]!;
+		expect(card.getExercise().sets.map((s) => s.weight)).toEqual([24, 0]);
+		expect(element(card.getRootEl(), ".ln-duration-previous").textContent).toBe("prev 1:00 @ 24 kg");
+		expect(element(card.getRootEl(), ".ln-exercise-previous-note").textContent)
+			.toBe("Last note (2026-09-22): skipped, grip sore");
 	});
 });

@@ -361,4 +361,14 @@ describe("ExerciseCard previous note", () => {
 		expect(card.getRootEl().querySelector(".ln-exercise-previous-note")).toBeNull();
 		card.destroy();
 	});
+
+	it("dates the note when it is newer than the session the hints come from", () => {
+		const lastData = { date: "2026-09-16", sets: [], note: "skipped, shoulder pain", noteDate: "2026-09-23" };
+		const card = new ExerciseCard(document.body, exercise("Bench"), lastData, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		expect(element(card.getRootEl(), ".ln-exercise-previous-note").textContent)
+			.toBe("Last note (2026-09-23): skipped, shoulder pain");
+		expect(element(card.getRootEl(), ".ln-exercise-last-date").textContent).toBe("Last: 2026-09-16");
+		card.destroy();
+	});
 });

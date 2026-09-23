@@ -59,7 +59,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 			{
 				name: "Hold buffer",
 				desc: "Seconds to get into and out of a hold: counted down before the hold clock starts and subtracted when you stop it. Set to 0 to turn it off.",
-				control: { type: "number", key: "holdBufferSeconds", placeholder: "5", min: 0, step: 1 },
+				control: { type: "number", key: "holdBufferSeconds", placeholder: "5", min: 0, max: 60, step: 1 },
 			},
 			{
 				name: "Keep screen awake",
@@ -133,7 +133,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 			}
 			case "holdBufferSeconds": {
 				const num = typeof value === "number" ? Math.floor(value) : NaN;
-				if (!Number.isFinite(num) || num < 0) return;
+				if (!Number.isFinite(num) || num < 0 || num > 60) return;
 				settings.holdBufferSeconds = num;
 				break;
 			}
@@ -234,7 +234,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 					.setValue(String(this.plugin.settings.holdBufferSeconds))
 					.onChange(async (value) => {
 						const num = parseInt(value, 10);
-						if (!isNaN(num) && num >= 0) {
+						if (!isNaN(num) && num >= 0 && num <= 60) {
 							this.plugin.settings.holdBufferSeconds = num;
 							await this.plugin.saveSettings();
 						}

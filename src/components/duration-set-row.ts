@@ -36,6 +36,7 @@ export function formatPreviousHold(previous: WorkoutSet): string {
 export class DurationSetRow {
 	private containerEl: HTMLElement;
 	private displayEl!: HTMLElement;
+	private actionBtn!: HTMLButtonElement;
 	private setNumberBtn!: HTMLButtonElement;
 	private set: WorkoutSet;
 	private state: State;
@@ -43,6 +44,7 @@ export class DurationSetRow {
 	private startTimeMs: number | null = null;
 	private intervalId: number | null = null;
 	private readonly bufferSeconds: number;
+	/** A carried-forward weight keeps its own unit; an unweighted set adopts the settings unit. */
 	private readonly weightUnit: "kg" | "lbs";
 	private readonly wakeLock = new WakeLockClaim();
 
@@ -56,7 +58,7 @@ export class DurationSetRow {
 	) {
 		this.set = { ...set };
 		this.bufferSeconds = Math.max(0, Math.floor(options.bufferSeconds ?? 0));
-		this.weightUnit = options.weightUnit ?? set.unit;
+		this.weightUnit = set.weight > 0 ? set.unit : (options.weightUnit ?? set.unit);
 		// Recover state from saved set:
 		// - completed = stopped (locked in)
 		// - has durationSeconds, not completed = stopped (mid-edit, can resume)
@@ -119,29 +121,17 @@ export class DurationSetRow {
 			weightInput.value = String(this.set.weight);
 		}
 		weightInput.addEventListener("input", () => {
-			this.set.weight = parseWeight(weightInput.value);
+			this.set.weight = Math.max(0, parseWeight(weightInput.value));
 			this.set.unit = this.weightUnit;
 			this.callbacks.onSetChanged(this.set);
 		});
 
 		// Action button (start / cancel / stop / reset)
-		const actionBtn = this.containerEl.createEl("button", {
+		this.actionBtn = this.containerEl.createEl("button", {
 			cls: "ln-duration-action",
 		});
-		if (this.state === "idle") {
-			actionBtn.textContent = "Start";
-			actionBtn.addClass("ln-duration-start");
-		} else if (this.state === "countdown") {
-			actionBtn.textContent = "Cancel";
-			actionBtn.addClass("ln-duration-cancel");
-		} else if (this.state === "running") {
-			actionBtn.textContent = "Stop";
-			actionBtn.addClass("ln-duration-stop");
-		} else {
-			actionBtn.textContent = "↺";
-			actionBtn.setAttr("aria-label", "Reset timer");
-		}
-		actionBtn.addEventListener("click", () => this.onAction());
+		this.updateActionButton();
+		this.actionBtn.addEventListener("click", () => this.onAction());
 
 		// Remove button
 		const removeBtn = this.containerEl.createEl("button", {
@@ -153,6 +143,47 @@ export class DurationSetRow {
 			this.stopTicker();
 			this.callbacks.onSetRemoved();
 		});
+	}
+
+	private updateActionButton(): void {
+		const btn = this.actionBtn;
+		btn.removeClass("ln-duration-start", "ln-duration-cancel", "ln-duration-stop");
+		btn.removeAttribute("aria-label");
+		if (this.state === "idle") {
+			btn.textContent = "Start";
+			btn.addClass("ln-duration-start");
+		} else if (this.state === "countdown") {
+			btn.textContent = "Cancel";
+			btn.addClass("ln-duration-cancel");
+		} else if (this.state === "running") {
+			btn.textContent = "Stop";
+			btn.addClass("ln-duration-stop");
+		} else {
+			btn.textContent = "↺";
+			btn.setAttr("aria-label", "Reset timer");
+		}
+	}
+
+	/**
+	 * Move countdown → running once the buffer is over. Driven by the clock, not
+	 * the ticker alone: a throttled background ticker may not have caught up yet.
+	 * Updates in place so a weight being typed survives.
+	 */
+	private syncCountdown(): void {
+		if (this.state !== "countdown" || this.startTimeMs === null || this.countdownRemaining() > 0) return;
+		this.startTimeMs += this.bufferSeconds * 1000;
+		this.state = "running";
+		if (navigator.vibrate) navigator.vibrate(200);
+		this.containerEl.removeClass("ln-duration-counting");
+		this.containerEl.querySelector(".ln-duration-countdown-label")?.remove();
+		this.updateActionButton();
+		this.displayEl.textContent = this.displayText();
+	}
+
+	private resetToIdle(): void {
+		this.startTimeMs = null;
+		this.state = "idle";
+		this.render();
 	}
 
 	private displayText(): string {
@@ -170,6 +201,7 @@ export class DurationSetRow {
 	}
 
 	private onAction(): void {
+		this.syncCountdown();
 		if (this.state === "idle") {
 			this.startTimeMs = Date.now();
 			this.state = this.bufferSeconds > 0 ? "countdown" : "running";
@@ -178,13 +210,17 @@ export class DurationSetRow {
 		} else if (this.state === "countdown") {
 			// Cancel before the hold began — nothing to record
 			this.stopTicker();
-			this.startTimeMs = null;
-			this.state = "idle";
-			this.render();
+			this.resetToIdle();
 		} else if (this.state === "running") {
 			this.stopTicker();
 			// The trailing buffer covers getting out of the hold and back to the phone
-			this.set.durationSeconds = Math.max(0, this.elapsedSeconds() - this.bufferSeconds);
+			const held = this.elapsedSeconds() - this.bufferSeconds;
+			if (held <= 0) {
+				// Stopped inside the buffer: no hold happened, record nothing
+				this.resetToIdle();
+				return;
+			}
+			this.set.durationSeconds = held;
 			this.set.completed = true;
 			this.state = "stopped";
 			this.render();
@@ -205,14 +241,8 @@ export class DurationSetRow {
 		this.wakeLock.hold();
 		this.intervalId = window.setInterval(() => {
 			if (this.startTimeMs === null) return;
-			if (this.state === "countdown" && this.countdownRemaining() <= 0) {
-				// Count-down over → the hold clock starts from 0
-				this.startTimeMs += this.bufferSeconds * 1000;
-				this.state = "running";
-				if (navigator.vibrate) navigator.vibrate(200);
-				this.render();
-				return;
-			}
+			// Count-down over → the hold clock starts from 0
+			this.syncCountdown();
 			this.displayEl.textContent = this.displayText();
 		}, 250);
 	}

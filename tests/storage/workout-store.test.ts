@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TFile, type App } from "obsidian";
+import { TFile, TFolder, type App } from "obsidian";
 import { WorkoutStore } from "../../src/storage/workout-store";
 import { workoutToFrontmatter } from "../../src/utils/frontmatter";
 import { DEFAULT_SETTINGS, type Workout } from "../../src/types";
@@ -37,14 +37,20 @@ function parseFrontmatter(yaml: string): Record<string, unknown> {
 	return fm;
 }
 
-function roundTrip(workout: Workout): Workout | null {
+function storeFor(workout: Workout) {
 	const file = Object.assign(new TFile(), { path: "Workouts/w.md", basename: "w" });
+	const folder = Object.assign(new TFolder(), { path: "Workouts", children: [file] });
 	const frontmatter = parseFrontmatter(workoutToFrontmatter(workout));
 	const app = {
-		vault: { getAbstractFileByPath: () => file },
+		vault: { getAbstractFileByPath: (path: string) => (path === "Workouts" ? folder : file) },
 		metadataCache: { getFileCache: () => ({ frontmatter }) },
 	} as unknown as App;
-	return new WorkoutStore(app, () => DEFAULT_SETTINGS).parseWorkoutFile(file.path);
+	return { store: new WorkoutStore(app, () => DEFAULT_SETTINGS), file };
+}
+
+function roundTrip(workout: Workout): Workout | null {
+	const { store, file } = storeFor(workout);
+	return store.parseWorkoutFile(file.path);
 }
 
 const base: Workout = {
@@ -88,5 +94,34 @@ describe("WorkoutStore.parseWorkoutFile round-trip", () => {
 			{ name: "Bench Press", note: "skipped, shoulder pain", sets: [] },
 			{ name: "Plank", exerciseType: "duration", note: "outlier: sick", sets: [] },
 		]);
+	});
+
+	it("parses a not-started timer without config and a completed one with it", () => {
+		const parsed = roundTrip({
+			...base,
+			exercises: [
+				{ name: "Tabata", exerciseType: "timer", note: "ran out of time", sets: [] },
+				{ name: "Burpees", exerciseType: "timer", sets: [], workSeconds: 40, restSeconds: 20, transitionSeconds: 0, intervals: 5 },
+			],
+		});
+		expect(parsed?.exercises).toEqual([
+			{ name: "Tabata", exerciseType: "timer", note: "ran out of time", sets: [] },
+			{ name: "Burpees", exerciseType: "timer", note: undefined, sets: [], workSeconds: 40, restSeconds: 20, transitionSeconds: 0, intervals: 5 },
+		]);
+	});
+});
+
+describe("WorkoutStore.getRecentWorkouts", () => {
+	it("counts only exercises that logged something, not note-only ones", () => {
+		const { store } = storeFor({
+			...base,
+			exercises: [
+				{ name: "Bench", sets: [{ weight: 80, reps: 5, unit: "kg", completed: true }] },
+				{ name: "Dips", note: "elbow", sets: [] },
+				{ name: "Tabata", exerciseType: "timer", note: "no time", sets: [] },
+				{ name: "Burpees", exerciseType: "timer", sets: [], workSeconds: 40, restSeconds: 20, intervals: 5 },
+			],
+		});
+		expect(store.getRecentWorkouts()).toEqual([expect.objectContaining({ exerciseCount: 2 })]);
 	});
 });

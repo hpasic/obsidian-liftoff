@@ -124,13 +124,54 @@ describe("DurationSetRow", () => {
 		row.destroy();
 	});
 
-	it("never records a negative hold when stopped inside the trailing buffer", () => {
+	it("treats a stop inside the trailing buffer as a cancel and records nothing", () => {
+		const release = vi.spyOn(screenWakeLock, "release");
 		const cb = callbacks();
 		const row = new DurationSetRow(document.body, 1, workoutSet(), null, cb, { bufferSeconds: 5 });
-		click(row.getRootEl(), ".ln-duration-action");
-		vi.advanceTimersByTime(5000 + 3000);
-		click(row.getRootEl(), ".ln-duration-action");
-		expect(cb.onSetCompleted).toHaveBeenCalledExactlyOnceWith({ ...workoutSet(), durationSeconds: 0, completed: true });
+		const root = row.getRootEl();
+		click(root, ".ln-duration-action");
+		vi.advanceTimersByTime(5000 + 5000); // held exactly the buffer: 0 seconds of real hold
+		click(root, ".ln-duration-action");
+		expect(cb.onSetCompleted).not.toHaveBeenCalled();
+		expect(cb.onSetChanged).not.toHaveBeenCalled();
+		expect(row.getSet()).toEqual(workoutSet());
+		expect(element(root, ".ln-duration-action").textContent).toBe("Start");
+		expect(element(root, ".ln-duration-display").textContent).toBe("0:00");
+		expect(root.classList.contains("ln-set-completed")).toBe(false);
+		expect(release).toHaveBeenCalledTimes(1);
+		expect(vi.getTimerCount()).toBe(0);
+		row.destroy();
+	});
+
+	it("a tap after a throttled count-down stops the hold instead of cancelling it", () => {
+		const cb = callbacks();
+		const row = new DurationSetRow(document.body, 1, workoutSet(), null, cb, { bufferSeconds: 5 });
+		const root = row.getRootEl();
+		click(root, ".ln-duration-action");
+		// Backgrounded: the clock moves on but the ticker never fired
+		vi.setSystemTime(Date.now() + 5000 + 25000 + 5000);
+		expect(element(root, ".ln-duration-action").textContent).toBe("Cancel");
+		click(root, ".ln-duration-action");
+		expect(cb.onSetCompleted).toHaveBeenCalledExactlyOnceWith({ ...workoutSet(), durationSeconds: 25, completed: true });
+		row.destroy();
+	});
+
+	it("keeps the weight input (and what is being typed) when the count-down ends", () => {
+		const cb = callbacks();
+		const row = new DurationSetRow(document.body, 1, workoutSet(), null, cb, { bufferSeconds: 5, weightUnit: "kg" });
+		const root = row.getRootEl();
+		click(root, ".ln-duration-action");
+		const weight = element<HTMLInputElement>(root, ".ln-duration-weight");
+		weight.value = "1"; // mid-typing, no input event yet
+		vi.advanceTimersByTime(5000);
+		expect(element(root, ".ln-duration-action").textContent).toBe("Stop");
+		expect(root.querySelector(".ln-duration-countdown-label")).toBeNull();
+		expect(root.classList.contains("ln-duration-counting")).toBe(false);
+		expect(element(root, ".ln-duration-weight")).toBe(weight);
+		expect(weight.isConnected).toBe(true);
+		expect(weight.value).toBe("1");
+		vi.advanceTimersByTime(3000);
+		expect(element(root, ".ln-duration-display").textContent).toBe("0:03");
 		row.destroy();
 	});
 
@@ -164,6 +205,28 @@ describe("DurationSetRow", () => {
 			{ ...workoutSet(), weight: 22.5, unit: "lbs", durationSeconds: 30, completed: true });
 		// Re-render keeps the typed weight
 		expect(element<HTMLInputElement>(root, ".ln-duration-weight").value).toBe("22.5");
+		row.destroy();
+	});
+
+	it("keeps a carried-forward weight in its own unit when the settings unit differs", () => {
+		const cb = callbacks();
+		const carried = { ...workoutSet(), weight: 20, unit: "kg" as const };
+		const row = new DurationSetRow(document.body, 1, carried, null, cb, { weightUnit: "lbs" });
+		const root = row.getRootEl();
+		const weight = element<HTMLInputElement>(root, ".ln-duration-weight");
+		expect(weight.value).toBe("20");
+		expect(weight.placeholder).toBe("kg");
+		expect(weight.getAttribute("aria-label")).toBe("Added weight (kg)");
+		input(root, ".ln-duration-weight", "21");
+		expect(cb.onSetChanged).toHaveBeenLastCalledWith({ ...carried, weight: 21, unit: "kg" });
+		row.destroy();
+	});
+
+	it("clamps a negative weight to bodyweight", () => {
+		const cb = callbacks();
+		const row = new DurationSetRow(document.body, 1, workoutSet(), null, cb, { weightUnit: "kg" });
+		input(row.getRootEl(), ".ln-duration-weight", "-5");
+		expect(cb.onSetChanged).toHaveBeenLastCalledWith({ ...workoutSet(), weight: 0, unit: "kg" });
 		row.destroy();
 	});
 });

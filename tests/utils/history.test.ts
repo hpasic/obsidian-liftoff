@@ -69,4 +69,39 @@ describe("findLastSetsForExercise", () => {
 		expect(findLastSetsForExercise(withNote, "Bench Press")!.note).toBe("increase weight next time");
 		expect(findLastSetsForExercise(workouts, "Bench Press")!.note).toBeUndefined();
 	});
+
+	it("takes sets from the newest session that logged sets and the note from the newest session", () => {
+		const noteOnly: Workout = {
+			...workouts[0]!, date: "2026-03-26",
+			exercises: [{ name: "Bench Press", note: "skipped, shoulder pain", sets: [] }],
+		};
+		const result = findLastSetsForExercise([noteOnly, ...workouts], "Bench Press")!;
+		expect(result.sets.map((s) => [s.weight, s.reps])).toEqual([[80, 10], [90, 8]]);
+		expect(result.date).toBe("2026-03-19");
+		expect(result.note).toBe("skipped, shoulder pain");
+		expect(result.noteDate).toBe("2026-03-26");
+	});
+
+	it("does not carry an older note past a newer session that logged sets without one", () => {
+		const older: Workout = { ...workouts[1]!, exercises: [{ ...workouts[1]!.exercises[0]!, note: "old news" }] };
+		const result = findLastSetsForExercise([workouts[0]!, older], "Bench Press")!;
+		expect(result.note).toBeUndefined();
+		expect(result.noteDate).toBe("2026-03-19");
+	});
+
+	it("takes timer config from the newest run timer, skipping a not-started one", () => {
+		const timer = (date: string, extra: object): Workout => ({
+			...workouts[0]!, date, exercises: [{ name: "Tabata", exerciseType: "timer", sets: [], ...extra }],
+		});
+		const result = findLastSetsForExercise([
+			timer("2026-03-26", { note: "no time today" }),
+			timer("2026-03-19", { workSeconds: 20, restSeconds: 10, transitionSeconds: 0, intervals: 8 }),
+		], "Tabata")!;
+		expect(result).toMatchObject({ date: "2026-03-19", workSeconds: 20, restSeconds: 10, intervals: 8, note: "no time today", noteDate: "2026-03-26" });
+	});
+
+	it("returns just the note when every session was note-only", () => {
+		const noteOnly: Workout = { ...workouts[0]!, exercises: [{ name: "Dips", note: "elbow", sets: [] }] };
+		expect(findLastSetsForExercise([noteOnly], "Dips")).toEqual({ date: "2026-03-19", sets: [], note: "elbow", noteDate: "2026-03-19" });
+	});
 });

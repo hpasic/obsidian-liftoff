@@ -87,9 +87,12 @@ export class ExerciseCard {
 		// Last session's note ("increase weight", "outlier: sick") — read-only
 		const previousNote = this.lastData?.note?.trim();
 		if (previousNote) {
+			// Dated when it is newer than the "Last:" session the hints come from
+			const noteDate = this.lastData?.noteDate;
+			const label = noteDate && noteDate !== this.lastData?.date ? `Last note (${noteDate})` : "Last note";
 			this.containerEl.createDiv({
 				cls: "ln-exercise-previous-note",
-				text: `Last note: ${previousNote}`,
+				text: `${label}: ${previousNote}`,
 			});
 		}
 

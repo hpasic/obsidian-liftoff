@@ -15,6 +15,9 @@ import { WakeLockClaim } from "../utils/wake-lock";
 
 export const WORKOUT_VIEW_TYPE = "liftoff-workout";
 
+/** The rest timer counts up until dismissed; after this long the screen may sleep again. */
+const REST_WAKE_LOCK_LIMIT_SECONDS = 10 * 60;
+
 export class WorkoutView extends ItemView {
 	private plugin: LiftOffPlugin;
 	private workout: Workout;
@@ -359,6 +362,8 @@ export class WorkoutView extends ItemView {
 		this.restTimerIntervalId = window.setInterval(() => {
 			if (!this.restStartTime || !this.restTimerEl) return;
 			const elapsed = Math.floor((Date.now() - this.restStartTime) / 1000);
+			// Keep counting, but stop holding the screen on after the last set
+			if (elapsed >= REST_WAKE_LOCK_LIMIT_SECONDS) this.restWakeLock.drop();
 			const m = Math.floor(elapsed / 60);
 			const s = elapsed % 60;
 			const valueEl = this.restTimerEl.querySelector(".ln-rest-timer-value") as HTMLElement;
@@ -552,7 +557,14 @@ export class WorkoutView extends ItemView {
 		const collected = this.collectWorkout();
 		const completedExercises = collected.exercises
 			.filter((e) => e.sets.some((s) => s.completed) || !!e.note?.trim())
-			.map((e) => ({ ...e, sets: e.sets.filter((s) => s.completed) }));
+			.map((e): Exercise => {
+				const sets = e.sets.filter((s) => s.completed);
+				if (e.exerciseType === "timer" && sets.length === 0) {
+					// Never run: drop the config so the note can't pass for a completed timer
+					return { name: e.name, exerciseType: "timer", sets, note: e.note };
+				}
+				return { ...e, sets };
+			});
 
 		if (completedExercises.length === 0) {
 			new Notice("No completed sets or notes to save.");

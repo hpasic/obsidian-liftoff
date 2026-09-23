@@ -323,3 +323,28 @@ describe("note-only exercises (no completed sets)", () => {
 		expect(body).not.toContain("| Set |");
 	});
 });
+
+describe("not-started timer (note only)", () => {
+	const notStarted: Workout = {
+		type: "workout", template: null, date: "2026-09-23", start: "18:00", end: "18:30", duration: 30,
+		exercises: [{ name: "Tabata", exerciseType: "timer", note: "ran out of time", sets: [] }],
+	};
+
+	it("keeps type and note but no timer config, and says it was not started", () => {
+		const fm = workoutToFrontmatter(notStarted);
+		expect(fm).toContain('  - name: Tabata\n    note: "ran out of time"\n    exerciseType: timer\n---');
+		expect(fm).not.toMatch(/workSeconds|restSeconds|intervals/);
+		const body = workoutToMarkdownBody(notStarted);
+		expect(body).toContain("## Tabata\n> ran out of time\n\n_Not started._");
+		expect(body).not.toContain("Intervals:");
+	});
+
+	it("leaves a completed timer's output unchanged", () => {
+		expect(workoutToFrontmatter(timerWorkout)).toBe([
+			"---", "type: workout", "template: HIIT", 'date: "2026-03-21"', 'start: "07:00"', 'end: "07:30"',
+			"duration: 30", "exercises:", "  - name: Burpees", "    exerciseType: timer", "    workSeconds: 40",
+			"    restSeconds: 20", "    intervals: 5", "---",
+		].join("\n"));
+		expect(workoutToMarkdownBody(timerWorkout)).toContain("## Burpees\nIntervals: 5 \u00D7 0:40 work / 0:20 rest");
+	});
+});
