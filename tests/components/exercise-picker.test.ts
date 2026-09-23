@@ -109,3 +109,62 @@ describe("ExercisePickerModal catalog", () => {
 		expect(onSelect).toHaveBeenCalledWith("zercher good morning thing", "weight");
 	});
 });
+
+function press(el: HTMLElement, key: string): KeyboardEvent {
+	const evt = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+	el.dispatchEvent(evt);
+	return evt;
+}
+
+describe("ExercisePickerModal keyboard access", () => {
+	it("makes chips and every kind of result row focusable buttons", () => {
+		const { root } = openPicker([{ name: "My zercher squat" }]);
+		input(root, ".ln-exercise-search", "zercher");
+		const targets = Array.from(root.querySelectorAll<HTMLElement>(".ln-picker-chip, .ln-exercise-result"));
+		expect(root.querySelectorAll(".ln-picker-chip").length).toBeGreaterThan(5);
+		for (const cls of [".ln-catalog-result", ".ln-exercise-create", ".ln-exercise-create-timer", ".ln-exercise-create-duration"]) {
+			expect(root.querySelector(cls), cls).not.toBeNull();
+		}
+		expect(targets.some((el) => el.textContent === "My zercher squat")).toBe(true);
+		for (const el of targets) {
+			expect(el.getAttribute("role"), el.textContent ?? "").toBe("button");
+			expect(el.getAttribute("tabindex"), el.textContent ?? "").toBe("0");
+		}
+	});
+
+	it("toggles a chip with Enter and Space and keeps focus on it", () => {
+		const { root } = openPicker();
+		const chip = element(root, ".ln-picker-chip");
+		const bodyPart = chip.textContent;
+		chip.focus();
+		expect(press(chip, "Enter").defaultPrevented).toBe(true);
+		const active = element(root, ".ln-picker-chip-active");
+		expect(active.textContent).toBe(bodyPart);
+		expect(active.getAttribute("aria-pressed")).toBe("true");
+		expect(document.activeElement).toBe(active);
+		expect(sectionLabels(root)).toEqual(["Catalog"]);
+		press(active, " ");
+		expect(root.querySelector(".ln-picker-chip-active")).toBeNull();
+		expect(document.activeElement?.textContent).toBe(bodyPart);
+		expect(sectionLabels(root)).toHaveLength(0);
+	});
+
+	it("selects catalog, library and create rows from the keyboard, ignoring other keys", () => {
+		const { root, onSelect } = openPicker([{ name: "My crunch", exerciseType: "duration" }]);
+		input(root, ".ln-exercise-search", "front plank with twist");
+		press(element(root, ".ln-catalog-result"), "a");
+		expect(onSelect).not.toHaveBeenCalled();
+		press(element(root, ".ln-catalog-result"), "Enter");
+		expect(onSelect).toHaveBeenLastCalledWith("Front plank with twist", "duration", "catalog");
+
+		const second = openPicker([{ name: "My crunch", exerciseType: "duration" }]);
+		press(element(second.root, ".ln-exercise-result"), " ");
+		expect(second.onSelect).toHaveBeenLastCalledWith("My crunch", "duration");
+
+		const third = openPicker();
+		input(third.root, ".ln-exercise-search", "odd lift");
+		press(element(third.root, ".ln-exercise-create-timer"), "Enter");
+		expect(third.onSelect).toHaveBeenLastCalledWith("odd lift", "timer");
+	});
+});
+

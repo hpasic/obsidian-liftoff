@@ -1159,6 +1159,13 @@
 	cursor: pointer;
 }
 
+/* Keyboard focus only — taps on mobile show no ring */
+.ln-picker-chip:focus-visible,
+.ln-exercise-result:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
 .ln-picker-chip-active {
 	background: var(--interactive-accent);
 	border-color: var(--interactive-accent);
