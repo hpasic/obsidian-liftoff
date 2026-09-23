@@ -68,6 +68,10 @@ export interface LiftOffSettings {
 	defaultRestDuration: number; // seconds
 	defaultWorkDuration: number; // seconds, for timer exercises
 	defaultRestIntervalDuration: number; // seconds, for timer exercises
+	/** Seconds to get into and out of a hold: a count-down before the clock, subtracted after. 0 disables. */
+	holdBufferSeconds: number;
+	/** Keep the screen on while any timer, hold, or rest timer is running. */
+	keepScreenAwake: boolean;
 	exerciseLibrary: ExerciseLibraryEntry[];
 }
 
@@ -79,5 +83,7 @@ export const DEFAULT_SETTINGS: LiftOffSettings = {
 	defaultRestDuration: 90,
 	defaultWorkDuration: 40,
 	defaultRestIntervalDuration: 20,
+	holdBufferSeconds: 5,
+	keepScreenAwake: true,
 	exerciseLibrary: [],
 };

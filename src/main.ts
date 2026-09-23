@@ -12,6 +12,7 @@ import { TemplateStore } from "./storage/template-store";
 import { HomeView, HOME_VIEW_TYPE } from "./views/home-view";
 import { WorkoutView, WORKOUT_VIEW_TYPE } from "./views/workout-view";
 import { ConfirmModal } from "./components/modals";
+import { screenWakeLock } from "./utils/wake-lock";
 
 interface PluginData {
 	settings: LiftOffSettings;
@@ -68,7 +69,9 @@ export default class LiftOffPlugin extends Plugin {
 		});
 	}
 
-	onunload() {}
+	onunload() {
+		screenWakeLock.reset();
+	}
 
 	private getOrCreateLeaf(): WorkspaceLeaf {
 		// Reuse an existing plugin leaf to avoid "No tab group" errors
@@ -189,9 +192,11 @@ export default class LiftOffPlugin extends Plugin {
 			this.settings = { ...DEFAULT_SETTINGS, ...raw };
 			this.activeWorkout = null;
 		}
+		screenWakeLock.setEnabled(this.settings.keepScreenAwake);
 	}
 
 	async saveSettings() {
+		screenWakeLock.setEnabled(this.settings.keepScreenAwake);
 		await this.savePluginData();
 	}
 
