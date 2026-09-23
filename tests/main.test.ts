@@ -8,15 +8,18 @@ import { DEFAULT_SETTINGS } from "../src/types";
 async function loadPlugin(data: unknown, marker?: string) {
 	const storage = new Map<string, unknown>(marker ? [[LAST_SEEN_VERSION_KEY, marker]] : []);
 	const layoutReady: (() => void)[] = [];
-	const plugin = new LiftOffPlugin();
+	const app = {
+		workspace: { onLayoutReady: (cb: () => void) => layoutReady.push(cb) },
+		loadLocalStorage: (key: string) => storage.get(key) ?? null,
+		saveLocalStorage: (key: string, value: unknown) => void storage.set(key, value),
+	};
+	const manifest = { version: "0.5.1" };
+	const plugin = new LiftOffPlugin(app as never, manifest as never);
 	const saveData = vi.fn().mockResolvedValue(undefined);
+	// The Plugin mock is bare; give this instance the surface onload uses
 	Object.assign(plugin, {
-		app: {
-			workspace: { onLayoutReady: (cb: () => void) => layoutReady.push(cb) },
-			loadLocalStorage: (key: string) => storage.get(key) ?? null,
-			saveLocalStorage: (key: string, value: unknown) => void storage.set(key, value),
-		},
-		manifest: { version: "0.5.1" },
+		app,
+		manifest,
 		loadData: vi.fn().mockResolvedValue(data),
 		saveData,
 		registerView: vi.fn(),
