@@ -17,7 +17,7 @@ Mobile-first gym workout tracker for [Obsidian](https://obsidian.md). Log sets, 
 - Duration exercises — a count-up stopwatch for planks, dead hangs, and L-sits
 - Built-in rest timer with auto-start, plus an interval timer for HIIT
 - Free-text notes per exercise
-- Exercise library with search
+- Exercise library with search, backed by a built-in catalog of 1,300+ exercises
 - Workout history stored as plain markdown files
 - Works great on mobile
 
@@ -56,6 +56,14 @@ A built-in rest timer with preset durations, an interval timer for HIIT-style wo
   <img src="screenshots/duration-hold.png" width="300" alt="Count-up stopwatch for a max-hold exercise" />
 </p>
 
+### Exercise catalog
+
+Adding an exercise searches your own library and a built-in catalog of 1,300+ exercises at once. Search by name, muscle, or equipment — shorthand like `db curl` works — or tap a body-part chip to browse. Each result shows its target muscle and equipment, and anything missing is one tap away with **+ Create**. The catalog is bundled with the plugin, so it works offline.
+
+<p align="center">
+  <img src="screenshots/exercise-catalog.png" width="300" alt="Exercise picker searching the built-in catalog, with body-part filter chips" />
+</p>
+
 ### Settings
 
 Configure workout and template folders, default weight unit, and rest timer presets.
@@ -76,3 +84,7 @@ Configure workout and template folders, default weight unit, and rest timer pres
 2. Create a folder `your-vault/.obsidian/plugins/liftoff/`
 3. Copy the downloaded files into that folder
 4. Enable the plugin in Settings > Community Plugins
+
+## Credits
+
+The built-in exercise catalog is generated from the MIT-licensed [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) by Hasan Emir Yıldırım — text fields only, no media. See [`src/data/EXERCISE-DATASET-LICENSE.md`](src/data/EXERCISE-DATASET-LICENSE.md).
