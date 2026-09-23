@@ -5,6 +5,7 @@ import type LiftOffPlugin from "../../src/main";
 import { WorkoutView } from "../../src/views/workout-view";
 import { DEFAULT_SETTINGS, type Exercise, type Workout } from "../../src/types";
 import { DurationSetRow } from "../../src/components/duration-set-row";
+import { screenWakeLock } from "../../src/utils/wake-lock";
 import { click, element, exercise, input, menuAction, trackIntervals } from "../helpers/dom";
 
 const views: WorkoutView[] = [];
@@ -163,6 +164,7 @@ describe("WorkoutView rest timer", () => {
 		click(owner!.getRootEl(), ".ln-set-check");
 		const rest = element(view.containerEl, ".ln-rest-timer");
 		const restId = tracking.ids().at(-1)!;
+		expect(screenWakeLock.held).toBe(1); // A running rest timer keeps the screen on
 		vi.advanceTimersByTime(2000);
 		menuAction(owner!.getRootEl(), "Move up");
 		expect(rest.previousElementSibling).toBe(owner!.getRootEl());
@@ -185,9 +187,14 @@ describe("WorkoutView rest timer", () => {
 		expect(rest.isConnected).toBe(false);
 		tracking.expectClearedOnce([restId]);
 		expect(vi.getTimerCount()).toBe(1); // Workout elapsed timer remains.
+		expect(screenWakeLock.held).toBe(0);
 		click(b!.getRootEl(), ".ln-set-check"); // Callback uses its new index.
 		expect(rest.previousElementSibling).toBe(b!.getRootEl());
+		click(b!.getRootEl(), ".ln-set-check");
+		click(b!.getRootEl(), ".ln-set-check"); // A restart still holds only once
+		expect(screenWakeLock.held).toBe(1);
 		click(rest, ".ln-rest-timer-dismiss");
+		expect(screenWakeLock.held).toBe(0);
 		tracking.expectClearedOnce([restId, tracking.ids().at(-1)!]);
 	});
 

@@ -11,6 +11,7 @@ import { remapIndexAfterRemoval, remapIndexAfterSwap } from "../utils/reorder";
 import { computeBests } from "../utils/sets";
 import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
 import { formatLocalDate } from "../utils/date";
+import { WakeLockClaim } from "../utils/wake-lock";
 
 export const WORKOUT_VIEW_TYPE = "liftoff-workout";
 
@@ -25,6 +26,7 @@ export class WorkoutView extends ItemView {
 	private restStartTime: number | null = null;
 	private restTimerEl: HTMLElement | null = null;
 	private activeRestExerciseIndex: number | null = null;
+	private readonly restWakeLock = new WakeLockClaim();
 	private recentWorkouts: Workout[] = [];
 	private initialized = false;
 	/** Parent of the exercise cards — structural ops append/reorder into it directly. */
@@ -344,6 +346,7 @@ export class WorkoutView extends ItemView {
 
 		this.restStartTime = Date.now();
 		this.activeRestExerciseIndex = exerciseIndex;
+		this.restWakeLock.hold();
 
 		this.mountRestTimerAt(exerciseIndex);
 
@@ -377,6 +380,7 @@ export class WorkoutView extends ItemView {
 		}
 		this.restStartTime = null;
 		this.activeRestExerciseIndex = null;
+		this.restWakeLock.drop();
 		if (this.restTimerEl) {
 			this.restTimerEl.addClass("ln-rest-timer-hidden");
 			this.restTimerEl.remove();

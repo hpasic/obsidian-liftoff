@@ -1,3 +1,5 @@
+import { WakeLockClaim } from "../utils/wake-lock";
+
 export interface TimerCallbacks {
 	onComplete: () => void;
 }
@@ -8,6 +10,7 @@ export class TimerDisplay {
 	private intervalId: number | null = null;
 	private remainingSeconds: number;
 	private running: boolean = false;
+	private readonly wakeLock = new WakeLockClaim();
 
 	constructor(
 		parentEl: HTMLElement,
@@ -69,6 +72,7 @@ export class TimerDisplay {
 	private start(): void {
 		if (this.running) return;
 		this.running = true;
+		this.wakeLock.hold();
 		this.intervalId = window.setInterval(() => {
 			this.remainingSeconds--;
 			this.updateDisplay();
@@ -82,6 +86,7 @@ export class TimerDisplay {
 
 	private stop(): void {
 		this.running = false;
+		this.wakeLock.drop();
 		if (this.intervalId !== null) {
 			window.clearInterval(this.intervalId);
 			this.intervalId = null;

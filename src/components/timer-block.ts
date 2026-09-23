@@ -1,3 +1,5 @@
+import { WakeLockClaim } from "../utils/wake-lock";
+
 export interface TimerBlockCallbacks {
 	onCompleted: () => void;
 	onChanged: (workSeconds: number, restSeconds: number, transitionSeconds: number, intervals: number) => void;
@@ -34,6 +36,7 @@ export class TimerBlock {
 	private intervalId: number | null = null;
 	private completed = false;
 	private readonly countInSeconds = 10;
+	private readonly wakeLock = new WakeLockClaim();
 
 	constructor(
 		parentEl: HTMLElement,
@@ -206,24 +209,28 @@ export class TimerBlock {
 		this.runPhase = "countdown";
 		this.countdown = this.countInSeconds;
 		this.phase = "running";
+		this.wakeLock.hold();
 		this.render();
 		this.tick();
 	}
 
 	private pause(): void {
 		this.stopInterval();
+		this.wakeLock.drop();
 		this.phase = "paused";
 		this.render();
 	}
 
 	private resume(): void {
 		this.phase = "running";
+		this.wakeLock.hold();
 		this.render();
 		this.tick();
 	}
 
 	private reset(): void {
 		this.stopInterval();
+		this.wakeLock.drop();
 		this.completed = false;
 		this.phase = "idle";
 		this.currentInterval = 1;
@@ -259,6 +266,7 @@ export class TimerBlock {
 				// All intervals done — no trailing rest
 				this.completed = true;
 				this.phase = "completed";
+				this.wakeLock.drop();
 				this.render();
 				this.callbacks.onCompleted();
 				return;
@@ -322,6 +330,7 @@ export class TimerBlock {
 
 	destroy(): void {
 		this.stopInterval();
+		this.wakeLock.drop();
 		this.containerEl.remove();
 	}
 }

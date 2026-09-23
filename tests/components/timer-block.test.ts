@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { TimerBlock } from "../../src/components/timer-block";
+import { screenWakeLock } from "../../src/utils/wake-lock";
 import { click, element, input, trackIntervals } from "../helpers/dom";
 
 function setup(initialCompleted = false) {
@@ -73,5 +74,26 @@ describe("TimerBlock", () => {
 		expect(timer.getState()).toEqual({ workSeconds: 12, restSeconds: 3, transitionSeconds: 1, intervals: 3, completed: false });
 		expect(vi.getTimerCount()).toBe(0);
 		timer.destroy();
+	});
+
+	it("keeps the screen awake only while running", () => {
+		const { root, timer } = setup();
+		expect(screenWakeLock.held).toBe(0);
+		click(root, ".ln-timer-block-start-btn");
+		expect(screenWakeLock.held).toBe(1);
+		vi.advanceTimersByTime(12000); // count-in → work → switch: one hold across phases
+		expect(screenWakeLock.held).toBe(1);
+		click(root, ".ln-timer-block-control-btn");
+		expect(screenWakeLock.held).toBe(0);
+		click(root, ".ln-timer-block-control-btn");
+		expect(screenWakeLock.held).toBe(1);
+		vi.advanceTimersByTime(60000);
+		expect(timer.getState().completed).toBe(true);
+		expect(screenWakeLock.held).toBe(0);
+		click(root, ".ln-timer-block-reset-btn");
+		click(root, ".ln-timer-block-start-btn");
+		timer.destroy();
+		timer.destroy();
+		expect(screenWakeLock.held).toBe(0);
 	});
 });
