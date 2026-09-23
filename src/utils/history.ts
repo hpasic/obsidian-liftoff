@@ -3,6 +3,8 @@ import type { Workout, WorkoutSet } from "../types";
 export interface LastExerciseData {
 	date: string;
 	sets: WorkoutSet[];
+	/** The note written for this exercise last time, if any. */
+	note?: string;
 	// Timer exercise data
 	workSeconds?: number;
 	restSeconds?: number;
@@ -28,6 +30,7 @@ export function findLastSetsForExercise(
 			return {
 				date: workout.date,
 				sets: exercise.sets,
+				note: exercise.note,
 				workSeconds: exercise.workSeconds,
 				restSeconds: exercise.restSeconds,
 				transitionSeconds: exercise.transitionSeconds,

@@ -75,4 +75,18 @@ describe("WorkoutStore.parseWorkoutFile round-trip", () => {
 			],
 		}]);
 	});
+
+	it("parses note-only exercises back with no sets and their note", () => {
+		const parsed = roundTrip({
+			...base,
+			exercises: [
+				{ name: "Bench Press", note: "skipped, shoulder pain", sets: [] },
+				{ name: "Plank", exerciseType: "duration", note: "outlier: sick", sets: [] },
+			],
+		});
+		expect(parsed?.exercises).toEqual([
+			{ name: "Bench Press", note: "skipped, shoulder pain", sets: [] },
+			{ name: "Plank", exerciseType: "duration", note: "outlier: sick", sets: [] },
+		]);
+	});
 });

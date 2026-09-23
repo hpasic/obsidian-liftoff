@@ -546,14 +546,16 @@ export class WorkoutView extends ItemView {
 		if (!confirmed) return;
 
 		// Copy rather than mutate: cards hold live references to these exercises,
-		// and the live workout must survive a failed save untouched
+		// and the live workout must survive a failed save untouched.
+		// An exercise with a note but no completed set is kept so the note
+		// ("skipped, shoulder pain") shows up next session.
 		const collected = this.collectWorkout();
 		const completedExercises = collected.exercises
-			.filter((e) => e.sets.some((s) => s.completed))
+			.filter((e) => e.sets.some((s) => s.completed) || !!e.note?.trim())
 			.map((e) => ({ ...e, sets: e.sets.filter((s) => s.completed) }));
 
 		if (completedExercises.length === 0) {
-			new Notice("No completed sets to save.");
+			new Notice("No completed sets or notes to save.");
 			return;
 		}
 

@@ -84,6 +84,15 @@ export class ExerciseCard {
 
 		this.renderMenuButton(headerRight);
 
+		// Last session's note ("increase weight", "outlier: sick") — read-only
+		const previousNote = this.lastData?.note?.trim();
+		if (previousNote) {
+			this.containerEl.createDiv({
+				cls: "ln-exercise-previous-note",
+				text: `Last note: ${previousNote}`,
+			});
+		}
+
 		// Exercise notes
 		const libraryEntry = this.settings.exerciseLibrary.find(
 			(e) => e.name.toLowerCase() === this.exercise.name.toLowerCase()

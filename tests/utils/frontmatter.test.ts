@@ -300,3 +300,26 @@ describe("setType serialization", () => {
 		expect(result).toContain("3 (drop)");
 	});
 });
+
+describe("note-only exercises (no completed sets)", () => {
+	const noteOnly: Workout = {
+		type: "workout", template: null, date: "2026-09-23", start: "18:00", end: "18:30", duration: 30,
+		exercises: [
+			{ name: "Bench Press", note: "skipped, shoulder pain", sets: [] },
+			{ name: "Plank", exerciseType: "duration", note: "outlier: sick", sets: [] },
+		],
+	};
+
+	it("writes an explicit empty set list in frontmatter", () => {
+		const fm = workoutToFrontmatter(noteOnly);
+		expect(fm).toContain('  - name: Bench Press\n    note: "skipped, shoulder pain"\n    sets: []\n');
+		expect(fm).toContain('    note: "outlier: sick"\n    exerciseType: duration\n    sets: []\n');
+	});
+
+	it("renders the note and a no-sets line instead of an empty table", () => {
+		const body = workoutToMarkdownBody(noteOnly);
+		expect(body).toContain("## Bench Press\n> skipped, shoulder pain\n\n_No sets completed._");
+		expect(body).toContain("## Plank\n> outlier: sick\n\n_No sets completed._");
+		expect(body).not.toContain("| Set |");
+	});
+});

@@ -49,7 +49,7 @@ export function workoutToFrontmatter(workout: Workout): string {
 			lines.push(`    intervals: ${exercise.intervals ?? 0}`);
 		} else if (exercise.exerciseType === "duration") {
 			lines.push(`    exerciseType: duration`);
-			lines.push("    sets:");
+			lines.push(exercise.sets.length > 0 ? "    sets:" : "    sets: []");
 			for (const set of exercise.sets) {
 				const parts = [`durationSeconds: ${set.durationSeconds ?? 0}`];
 				// Weighted holds only — unweighted ones keep their original shape
@@ -62,7 +62,7 @@ export function workoutToFrontmatter(workout: Workout): string {
 				lines.push(`      - { ${parts.join(", ")} }`);
 			}
 		} else {
-			lines.push("    sets:");
+			lines.push(exercise.sets.length > 0 ? "    sets:" : "    sets: []");
 			for (const set of exercise.sets) {
 				const parts = [
 					`weight: ${set.weight}`,
@@ -116,6 +116,9 @@ export function workoutToMarkdownBody(workout: Workout): string {
 			const n = exercise.intervals ?? 0;
 			const switchPart = t > 0 ? ` / ${formatTime(t)} switch` : "";
 			lines.push(`Intervals: ${n} \u00D7 ${w} work / ${r} rest${switchPart}`);
+		} else if (exercise.sets.length === 0) {
+			// Kept for its note only
+			lines.push("_No sets completed._");
 		} else if (exercise.exerciseType === "duration") {
 			const weighted = exercise.sets.some((set) => set.weight > 0);
 			lines.push(weighted ? "| Set | Time | Weight |" : "| Set | Time |");

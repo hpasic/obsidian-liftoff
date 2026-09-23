@@ -341,3 +341,24 @@ describe("ExerciseCard", () => {
 		card.destroy();
 	});
 });
+
+describe("ExerciseCard previous note", () => {
+	it.each(["weight", "duration", "timer"] as const)("shows last session's note on a %s card", (type) => {
+		const lastData = { date: "2026-09-20", sets: [], note: "  increase weight next time\n" };
+		const card = new ExerciseCard(document.body, exercise("Lift", type), lastData, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const note = element(card.getRootEl(), ".ln-exercise-previous-note");
+		expect(note.textContent).toBe("Last note: increase weight next time");
+		// Read-only: it sits under the header, apart from this session's note input
+		expect(note.previousElementSibling?.classList.contains("ln-exercise-header")).toBe(true);
+		expect(element<HTMLTextAreaElement>(card.getRootEl(), ".ln-exercise-note-input").value).toBe("");
+		card.destroy();
+	});
+
+	it.each([undefined, "   "])("renders nothing when the previous note is %j", (note) => {
+		const card = new ExerciseCard(document.body, exercise("Lift"), { date: "2026-09-20", sets: [], note },
+			SETTINGS, EMPTY_BESTS, { onExerciseChanged: vi.fn() });
+		expect(card.getRootEl().querySelector(".ln-exercise-previous-note")).toBeNull();
+		card.destroy();
+	});
+});

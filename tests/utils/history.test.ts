@@ -63,4 +63,10 @@ describe("findLastSetsForExercise", () => {
 		expect(result).not.toBeNull();
 		expect(result!.sets[0]!.weight).toBe(80);
 	});
+
+	it("carries last session's note for that exercise", () => {
+		const withNote = [{ ...workouts[0]!, exercises: [{ ...workouts[0]!.exercises[0]!, note: "increase weight next time" }] }];
+		expect(findLastSetsForExercise(withNote, "Bench Press")!.note).toBe("increase weight next time");
+		expect(findLastSetsForExercise(workouts, "Bench Press")!.note).toBeUndefined();
+	});
 });
