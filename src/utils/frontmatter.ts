@@ -52,6 +52,10 @@ export function workoutToFrontmatter(workout: Workout): string {
 			lines.push("    sets:");
 			for (const set of exercise.sets) {
 				const parts = [`durationSeconds: ${set.durationSeconds ?? 0}`];
+				// Weighted holds only — unweighted ones keep their original shape
+				if (set.weight > 0) {
+					parts.push(`weight: ${set.weight}`, `unit: ${set.unit}`);
+				}
 				if (set.setType && set.setType !== "working") {
 					parts.push(`setType: ${set.setType}`);
 				}
@@ -113,14 +117,19 @@ export function workoutToMarkdownBody(workout: Workout): string {
 			const switchPart = t > 0 ? ` / ${formatTime(t)} switch` : "";
 			lines.push(`Intervals: ${n} \u00D7 ${w} work / ${r} rest${switchPart}`);
 		} else if (exercise.exerciseType === "duration") {
-			lines.push("| Set | Time |");
-			lines.push("|-----|------|");
+			const weighted = exercise.sets.some((set) => set.weight > 0);
+			lines.push(weighted ? "| Set | Time | Weight |" : "| Set | Time |");
+			lines.push(weighted ? "|-----|------|--------|" : "|-----|------|");
 			exercise.sets.forEach((set, i) => {
 				const typeSuffix = SET_TYPE_BODY_LABEL[effectiveSetType(set)] ?? "";
 				const setLabel = `${i + 1}${typeSuffix}`;
-				lines.push(
-					`| ${setLabel.padEnd(3)} | ${formatTime(set.durationSeconds ?? 0).padEnd(4)} |`
-				);
+				const row = `| ${setLabel.padEnd(3)} | ${formatTime(set.durationSeconds ?? 0).padEnd(4)} |`;
+				if (!weighted) {
+					lines.push(row);
+					return;
+				}
+				const weightStr = set.weight > 0 ? `${set.weight} ${set.unit}` : "BW";
+				lines.push(`${row} ${weightStr.padEnd(6)} |`);
 			});
 		} else {
 			lines.push("| Set | Weight | Reps |");

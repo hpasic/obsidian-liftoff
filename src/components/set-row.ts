@@ -7,7 +7,7 @@ import {
 	type PRKind,
 } from "../utils/sets";
 
-function parseWeight(value: string): number {
+export function parseWeight(value: string): number {
 	const n = parseFloat(value.replace(",", "."));
 	return Number.isFinite(n) ? n : 0;
 }

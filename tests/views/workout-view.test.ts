@@ -14,7 +14,7 @@ afterEach(async () => {
 
 function setup(exercises: Exercise[] = []) {
 	const plugin = {
-		settings: { ...DEFAULT_SETTINGS, exerciseLibrary: [] },
+		settings: { ...DEFAULT_SETTINGS, holdBufferSeconds: 0, exerciseLibrary: [] },
 		workoutStore: { getRecentWorkouts: vi.fn(() => []) },
 		persistActiveWorkout: vi.fn().mockResolvedValue(undefined),
 		saveSettings: vi.fn().mockResolvedValue(undefined),

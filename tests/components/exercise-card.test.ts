@@ -6,6 +6,9 @@ import { DEFAULT_SETTINGS, type WorkoutSet } from "../../src/types";
 import { EMPTY_BESTS } from "../../src/utils/sets";
 import { click, element, exercise, input, trackIntervals, workoutSet } from "../helpers/dom";
 
+// Hold timing without the get-set buffer; buffer behaviour has its own tests
+const SETTINGS = { ...DEFAULT_SETTINGS, holdBufferSeconds: 0 };
+
 function expectDurationSets(card: ExerciseCard, rows: DurationSetRow[], sets: WorkoutSet[]) {
 	// Read-only inspection: all mutations go through the real DOM handlers.
 	const actualRows = card["setRows"];
@@ -34,7 +37,7 @@ describe("ExerciseCard duration set operations", () => {
 			date: "2026-09-20",
 			sets: [30, 60, 90].map((durationSeconds) => ({ ...workoutSet(), durationSeconds })),
 		};
-		const card = new ExerciseCard(document.body, data, lastData, DEFAULT_SETTINGS, EMPTY_BESTS,
+		const card = new ExerciseCard(document.body, data, lastData, SETTINGS, EMPTY_BESTS,
 			{ onExerciseChanged: vi.fn() });
 		const root = card.getRootEl();
 		const rows = [...card["setRows"]] as DurationSetRow[];
@@ -89,7 +92,7 @@ describe("ExerciseCard duration set operations", () => {
 			date: "2026-09-20",
 			sets: [first, second, 0].map((durationSeconds) => ({ ...workoutSet(), durationSeconds })),
 		};
-		const card = new ExerciseCard(document.body, data, lastData, DEFAULT_SETTINGS, EMPTY_BESTS,
+		const card = new ExerciseCard(document.body, data, lastData, SETTINGS, EMPTY_BESTS,
 			{ onExerciseChanged: vi.fn() });
 		const rows = [...card["setRows"]] as DurationSetRow[];
 		const shiftedRoot = rows[1]!.getRootEl();
@@ -108,7 +111,7 @@ describe("ExerciseCard duration set operations", () => {
 		const data = exercise("Plank", "duration");
 		data.sets = [workoutSet(), workoutSet(), workoutSet()];
 		const callbacks = { onExerciseChanged: vi.fn(), onSetCompleted: vi.fn() };
-		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, EMPTY_BESTS, callbacks);
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS, callbacks);
 		const root = card.getRootEl();
 		const rows = [...card["setRows"]] as DurationSetRow[];
 		const running = rows[1]!;
@@ -160,7 +163,7 @@ describe("ExerciseCard duration set operations", () => {
 		const data = exercise("Plank", "duration");
 		data.sets = [workoutSet(), workoutSet()];
 		const callbacks = { onExerciseChanged: vi.fn(), onSetCompleted: vi.fn() };
-		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, EMPTY_BESTS, callbacks);
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS, callbacks);
 		const [removed, sibling] = card["setRows"] as DurationSetRow[];
 		click(removed!.getRootEl(), ".ln-duration-action");
 		click(sibling!.getRootEl(), ".ln-duration-action");
@@ -200,7 +203,7 @@ describe("ExerciseCard duration set operations", () => {
 		data.sets = ["working", "warmup", "drop", "failure"].map((setType) =>
 			({ ...workoutSet(), setType } as WorkoutSet));
 		const callbacks = { onExerciseChanged: vi.fn(), onSetCompleted: vi.fn() };
-		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, EMPTY_BESTS, callbacks);
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS, callbacks);
 		const rows = [...card["setRows"]] as DurationSetRow[];
 		const sets = data.sets.map((set) => ({ ...set }));
 		expectDurationSets(card, rows, sets);
@@ -272,7 +275,7 @@ describe("ExerciseCard", () => {
 		const tracking = trackIntervals();
 		const data = exercise("Exercise", type);
 		const callbacks = { onExerciseChanged: vi.fn(), onSetCompleted: vi.fn() };
-		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, EMPTY_BESTS, callbacks);
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS, callbacks);
 		const root = card.getRootEl();
 		click(root, type === "timer" ? ".ln-timer-block-start-btn" : ".ln-duration-action");
 		const display = element(root, type === "timer" ? ".ln-timer-block-countdown" : ".ln-duration-display");
@@ -296,7 +299,7 @@ describe("ExerciseCard", () => {
 		const tracking = trackIntervals();
 		const data = exercise("Plank", "duration");
 		data.sets = [workoutSet(), workoutSet(), workoutSet()];
-		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, EMPTY_BESTS,
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS,
 			{ onExerciseChanged: vi.fn() });
 		for (const row of Array.from(card.getRootEl().querySelectorAll(".ln-duration-row"))) {
 			click(row, ".ln-duration-action");
@@ -312,7 +315,7 @@ describe("ExerciseCard", () => {
 		const data = exercise("Intervals", "timer");
 		data.intervals = 1;
 		const callbacks = { onExerciseChanged: vi.fn(), onSetCompleted: vi.fn() };
-		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, EMPTY_BESTS, callbacks);
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS, callbacks);
 		input(card.getRootEl(), ".ln-timer-block-input", "2");
 		expect(data.workSeconds).toBe(2);
 		expect(callbacks.onExerciseChanged).toHaveBeenLastCalledWith(data);
@@ -328,7 +331,7 @@ describe("ExerciseCard", () => {
 	it("writes a completed hold through and updates the card count", () => {
 		const data = exercise("Plank", "duration");
 		const callbacks = { onExerciseChanged: vi.fn(), onSetCompleted: vi.fn() };
-		const card = new ExerciseCard(document.body, data, null, DEFAULT_SETTINGS, EMPTY_BESTS, callbacks);
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS, callbacks);
 		click(card.getRootEl(), ".ln-duration-action");
 		vi.advanceTimersByTime(4250);
 		click(card.getRootEl(), ".ln-duration-action");

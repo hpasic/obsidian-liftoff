@@ -429,13 +429,17 @@ export class WorkoutView extends ItemView {
 			newExercise = {
 				name,
 				exerciseType,
-				sets: Array.from({ length: seedCount }, () => ({
-					weight: 0,
-					reps: 0,
-					unit: this.plugin.settings.weightUnit,
-					completed: false,
-					durationSeconds: 0,
-				})),
+				// Weighted holds carry their weight forward; the time starts fresh
+				sets: Array.from({ length: seedCount }, (_, i) => {
+					const prev = lastData?.sets[i];
+					return {
+						weight: prev?.weight ?? 0,
+						reps: 0,
+						unit: prev && prev.weight > 0 ? prev.unit : this.plugin.settings.weightUnit,
+						completed: false,
+						durationSeconds: 0,
+					};
+				}),
 			};
 		} else {
 			newExercise = {

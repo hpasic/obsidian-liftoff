@@ -99,9 +99,9 @@ export class WorkoutStore {
 					if (Array.isArray(ex.sets)) {
 						for (const s of ex.sets as Array<Record<string, unknown>>) {
 							const set: WorkoutSet = {
-								weight: 0,
+								weight: Number(s.weight) || 0,
 								reps: 0,
-								unit: "kg",
+								unit: s.unit === "lbs" ? "lbs" : "kg",
 								completed: true,
 								durationSeconds: Number(s.durationSeconds) || 0,
 							};

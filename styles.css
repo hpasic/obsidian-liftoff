@@ -411,6 +411,13 @@
 	outline: 2px solid var(--interactive-accent);
 }
 
+.ln-exercise-previous-note {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-top: 4px;
+	white-space: pre-wrap;
+}
+
 .ln-exercise-previous {
 	font-size: 11px;
 	color: var(--text-faint);
@@ -560,8 +567,9 @@
 /* --- Duration Set Row --- */
 .ln-duration-row {
 	display: grid;
-	grid-template-columns: 40px 1fr 90px 44px;
-	gap: 8px;
+	/* set · time · added weight · action · remove — fits the 296px mobile card */
+	grid-template-columns: 40px minmax(0, 1fr) 52px 68px 44px;
+	gap: 6px;
 	align-items: center;
 	margin-bottom: 8px;
 }
@@ -584,11 +592,24 @@
 	font-size: 10px;
 	color: var(--text-faint);
 	margin-top: 2px;
+	text-align: center;
+}
+
+.ln-duration-countdown-label {
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--text-accent);
+}
+
+.ln-duration-row.ln-duration-counting .ln-duration-display {
+	color: var(--text-accent);
 }
 
 .ln-duration-action {
 	min-height: 44px;
-	padding: 10px 14px;
+	padding: 10px 6px;
 	border-radius: 8px;
 	border: none;
 	cursor: pointer;

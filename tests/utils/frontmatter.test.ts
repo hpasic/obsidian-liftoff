@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { workoutToFrontmatter, workoutToMarkdownBody } from "../../src/utils/frontmatter";
+import { workoutToFrontmatter, workoutToFullMarkdown, workoutToMarkdownBody } from "../../src/utils/frontmatter";
 import type { Workout } from "../../src/types";
 
 const sampleWorkout: Workout = {
@@ -168,6 +168,64 @@ describe("duration exercise serialization", () => {
 		expect(result).toContain("1:00");
 		expect(result).toContain("1:15");
 		expect(result).not.toContain("Weight");
+	});
+
+	it("keeps unweighted holds byte-identical to the pre-weight format", () => {
+		const unweighted: Workout = {
+			...durationWorkout,
+			exercises: [{
+				...durationWorkout.exercises[0]!,
+				// Settings unit is irrelevant for 0 weight and must not leak into the note
+				sets: [
+					{ weight: 0, reps: 0, unit: "lbs", completed: true, durationSeconds: 60, setType: "warmup" },
+					{ weight: 0, reps: 0, unit: "kg", completed: true, durationSeconds: 75 },
+				],
+			}],
+		};
+		expect(workoutToFullMarkdown(unweighted)).toBe([
+			"---",
+			"type: workout",
+			'date: "2026-05-25"',
+			'start: "10:00"',
+			'end: "10:20"',
+			"duration: 20",
+			"exercises:",
+			"  - name: Plank",
+			"    exerciseType: duration",
+			"    sets:",
+			"      - { durationSeconds: 60, setType: warmup }",
+			"      - { durationSeconds: 75 }",
+			"---",
+			"# Workout — May 25, 2026",
+			"",
+			"## Plank",
+			"| Set | Time |",
+			"|-----|------|",
+			"| 1 (W) | 1:00 |",
+			"| 2   | 1:15 |",
+			"",
+		].join("\n"));
+	});
+
+	it("writes weight and unit only on weighted holds and adds a Weight column", () => {
+		const weighted: Workout = {
+			...durationWorkout,
+			exercises: [{
+				...durationWorkout.exercises[0]!,
+				name: "Farmer's Hold",
+				sets: [
+					{ weight: 20, reps: 0, unit: "kg", completed: true, durationSeconds: 60 },
+					{ weight: 0, reps: 0, unit: "kg", completed: true, durationSeconds: 45, setType: "failure" },
+				],
+			}],
+		};
+		const fm = workoutToFrontmatter(weighted);
+		expect(fm).toContain("      - { durationSeconds: 60, weight: 20, unit: kg }");
+		expect(fm).toContain("      - { durationSeconds: 45, setType: failure }");
+		const body = workoutToMarkdownBody(weighted);
+		expect(body).toContain("| Set | Time | Weight |\n|-----|------|--------|");
+		expect(body).toContain("| 1   | 1:00 | 20 kg  |");
+		expect(body).toContain("| 2 (failure) | 0:45 | BW     |");
 	});
 });
 
