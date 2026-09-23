@@ -1,3 +1,4 @@
+/* global LIFTOFF_CHANGELOG -- CHANGELOG.md, inlined at build time (src/changelog.d.ts) */
 import { Plugin, WorkspaceLeaf, Notice } from "obsidian";
 import {
 	DEFAULT_SETTINGS,
@@ -13,6 +14,7 @@ import { HomeView, HOME_VIEW_TYPE } from "./views/home-view";
 import { WorkoutView, WORKOUT_VIEW_TYPE } from "./views/workout-view";
 import { ConfirmModal } from "./components/modals";
 import { screenWakeLock } from "./utils/wake-lock";
+import { showWhatsNewIfUpdated } from "./components/whats-new-modal";
 
 interface PluginData {
 	settings: LiftOffSettings;
@@ -35,6 +37,12 @@ export default class LiftOffPlugin extends Plugin {
 		this.registerView(WORKOUT_VIEW_TYPE, (leaf) => new WorkoutView(leaf, this));
 
 		this.addSettingTab(new LiftOffSettingTab(this.app, this));
+
+		this.app.workspace.onLayoutReady(() => {
+			void showWhatsNewIfUpdated(this.app, this.settings, this.manifest.version, LIFTOFF_CHANGELOG, () =>
+				this.saveSettings()
+			);
+		});
 
 		this.addRibbonIcon("dumbbell", "Open liftoff", () => {
 			void this.showHomeView();

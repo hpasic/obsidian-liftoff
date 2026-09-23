@@ -1308,6 +1308,20 @@
 	min-height: 44px;
 }
 
+/* --- What's new --- */
+.ln-whats-new-body {
+	max-height: 60vh;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	margin-bottom: 16px;
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+.ln-whats-new-body ul {
+	padding-left: 20px;
+}
+
 /* --- Template Editor --- */
 .ln-template-editor {
 	padding: 8px;

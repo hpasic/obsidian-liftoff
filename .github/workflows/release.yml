@@ -34,6 +34,18 @@ jobs:
           node-version-file: ".nvmrc"
           cache: npm
 
+      # Before anything else, so a tag without a CHANGELOG.md section fails fast
+      - name: Release notes from CHANGELOG.md
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [ -f scripts/changelog-notes.mjs ]; then
+            node scripts/changelog-notes.mjs "$TAG" > "$RUNNER_TEMP/release-notes.md"
+          else
+            # Re-running a tag from before CHANGELOG.md existed (workflow_dispatch)
+            echo "::notice::No scripts/changelog-notes.mjs at $TAG; using generated notes"
+          fi
+
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
@@ -60,10 +72,15 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [ -f "$RUNNER_TEMP/release-notes.md" ]; then
+              notes=(--notes-file "$RUNNER_TEMP/release-notes.md")
+            else
+              notes=(--generate-notes)
+            fi
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$TAG" \
-              --generate-notes
+              "${notes[@]}"
           fi
           gh release upload "$TAG" \
             --repo "$GITHUB_REPOSITORY" \

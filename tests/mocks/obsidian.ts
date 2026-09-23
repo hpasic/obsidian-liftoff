@@ -71,6 +71,20 @@ export class ItemView {
 	}
 }
 
+export class Component {
+	loaded = false;
+	load(): void { this.loaded = true; }
+	unload(): void { this.loaded = false; }
+}
+
+export const MarkdownRenderer = {
+	// Stand-in renderer: keeps the markdown source visible for assertions
+	render(_app: unknown, markdown: string, el: HTMLElement): Promise<void> {
+		el.createDiv({ cls: "markdown-rendered", text: markdown });
+		return Promise.resolve();
+	},
+};
+
 export class Modal {
 	modalEl = createEl("div", { cls: "modal" });
 	contentEl = this.modalEl.createDiv({ cls: "modal-content" });
