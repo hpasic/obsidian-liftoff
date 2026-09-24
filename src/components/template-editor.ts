@@ -1,20 +1,25 @@
 import { App, Modal } from "obsidian";
-import type { WorkoutTemplate, ExerciseLibraryEntry } from "../types";
+import type { WorkoutTemplate, ExerciseLibraryEntry, TemplateExercise } from "../types";
 import { ExercisePickerModal } from "./exercise-picker";
 
 export class TemplateEditorModal extends Modal {
 	private template: WorkoutTemplate;
 	private library: ExerciseLibraryEntry[];
 	private recentNames: string[];
-	private onSave: (template: WorkoutTemplate) => void;
+	private onSave: (template: WorkoutTemplate, catalogNames: Set<string>) => void;
 	private listEl: HTMLElement = null!;
+	/**
+	 * Rows added this session by a catalog pick. Keyed by row identity, so a
+	 * removed row takes its provenance with it; never written to the template.
+	 */
+	private catalogRows = new WeakSet<TemplateExercise>();
 
 	constructor(
 		app: App,
 		template: WorkoutTemplate,
 		library: ExerciseLibraryEntry[],
 		recentNames: string[],
-		onSave: (template: WorkoutTemplate) => void
+		onSave: (template: WorkoutTemplate, catalogNames: Set<string>) => void
 	) {
 		super(app);
 		this.template = {
@@ -45,12 +50,14 @@ export class TemplateEditorModal extends Modal {
 				this.app,
 				this.library,
 				this.recentNames,
-				(name, exerciseType) => {
-					this.template.exercises.push({
+				(name, exerciseType, source) => {
+					const row: TemplateExercise = {
 						name,
 						targetSets: 3,
 						exerciseType: exerciseType === "weight" ? undefined : exerciseType,
-					});
+					};
+					if (source === "catalog") this.catalogRows.add(row);
+					this.template.exercises.push(row);
 					this.renderExercises();
 				}
 			).open();
@@ -61,9 +68,19 @@ export class TemplateEditorModal extends Modal {
 			text: "Save template",
 		});
 		saveBtn.addEventListener("click", () => {
-			this.onSave(this.template);
+			this.onSave(this.template, this.catalogPickNames());
 			this.close();
 		});
+	}
+
+	/** Lower-cased names whose every remaining row came from a catalog pick. */
+	private catalogPickNames(): Set<string> {
+		const byName = new Map<string, boolean>();
+		for (const row of this.template.exercises) {
+			const key = row.name.toLowerCase();
+			byName.set(key, (byName.get(key) ?? true) && this.catalogRows.has(row));
+		}
+		return new Set([...byName].filter(([, allCatalog]) => allCatalog).map(([name]) => name));
 	}
 
 	private renderExercises(): void {

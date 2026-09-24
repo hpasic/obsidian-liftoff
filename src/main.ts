@@ -1,3 +1,4 @@
+/* global LIFTOFF_CHANGELOG -- CHANGELOG.md, inlined at build time (src/changelog.d.ts) */
 import { Plugin, WorkspaceLeaf, Notice } from "obsidian";
 import {
 	DEFAULT_SETTINGS,
@@ -13,6 +14,7 @@ import { HomeView, HOME_VIEW_TYPE } from "./views/home-view";
 import { WorkoutView, WORKOUT_VIEW_TYPE } from "./views/workout-view";
 import { ConfirmModal } from "./components/modals";
 import { screenWakeLock } from "./utils/wake-lock";
+import { showWhatsNewIfUpdated } from "./components/whats-new-modal";
 
 interface PluginData {
 	settings: LiftOffSettings;
@@ -24,6 +26,8 @@ export default class LiftOffPlugin extends Plugin {
 	activeWorkout: ActiveWorkout | null = null;
 	workoutStore: WorkoutStore = null!;
 	templateStore: TemplateStore = null!;
+	/** data.json existed at load — tells a first install from an upgrade. */
+	private hadSavedData = false;
 
 	async onload() {
 		await this.loadPluginData();
@@ -35,6 +39,15 @@ export default class LiftOffPlugin extends Plugin {
 		this.registerView(WORKOUT_VIEW_TYPE, (leaf) => new WorkoutView(leaf, this));
 
 		this.addSettingTab(new LiftOffSettingTab(this.app, this));
+
+		this.app.workspace.onLayoutReady(() => {
+			showWhatsNewIfUpdated(
+				this.app,
+				{ hadSavedData: this.hadSavedData, showWhatsNew: this.settings.showWhatsNew },
+				this.manifest.version,
+				LIFTOFF_CHANGELOG
+			);
+		});
 
 		this.addRibbonIcon("dumbbell", "Open liftoff", () => {
 			void this.showHomeView();
@@ -184,6 +197,7 @@ export default class LiftOffPlugin extends Plugin {
 
 	async loadPluginData() {
 		const raw = (await this.loadData()) as Partial<PluginData & LiftOffSettings> | null;
+		this.hadSavedData = raw !== null && raw !== undefined;
 		if (raw && typeof raw === "object" && "settings" in raw && raw.settings) {
 			this.settings = { ...DEFAULT_SETTINGS, ...raw.settings };
 			this.activeWorkout = raw.activeWorkout ?? null;

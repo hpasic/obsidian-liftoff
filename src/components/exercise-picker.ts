@@ -14,6 +14,20 @@ const CATALOG_RENDER_CAP = 50;
 
 export type ExerciseSource = "catalog";
 
+/** Keyboard-reachable tap target that keeps its div styling: focusable, Enter/Space activate. */
+function makeActivatable(el: HTMLElement, activate: () => void): void {
+	el.setAttr("role", "button");
+	el.setAttr("tabindex", "0");
+	el.addEventListener("click", activate);
+	el.addEventListener("keydown", (evt) => {
+		if (evt.key !== "Enter" && evt.key !== " ") return;
+		evt.preventDefault(); // Space would scroll the results
+		// Holding the key down must not toggle a chip over and over
+		if (evt.repeat) return;
+		activate();
+	});
+}
+
 export class ExercisePickerModal extends Modal {
 	private searchInput: HTMLInputElement;
 	private resultsEl: HTMLElement;
@@ -68,15 +82,21 @@ export class ExercisePickerModal extends Modal {
 	}
 
 	private renderChips(): void {
+		const focused = this.chipsEl.ownerDocument.activeElement;
+		const hadFocus = focused && this.chipsEl.contains(focused) ? focused.textContent : null;
 		this.chipsEl.empty();
 		for (const bodyPart of getCatalogBodyParts()) {
 			const chip = this.chipsEl.createDiv({ cls: "ln-picker-chip", text: bodyPart });
-			chip.toggleClass("ln-picker-chip-active", this.activeBodyPart === bodyPart);
-			chip.addEventListener("click", () => {
+			const active = this.activeBodyPart === bodyPart;
+			chip.toggleClass("ln-picker-chip-active", active);
+			makeActivatable(chip, () => {
 				this.activeBodyPart = this.activeBodyPart === bodyPart ? null : bodyPart;
 				this.renderChips();
 				this.updateResults(this.searchInput.value);
 			});
+			chip.setAttr("aria-pressed", String(active));
+			// Re-rendering must not drop keyboard focus
+			if (hadFocus === bodyPart) chip.focus({ preventScroll: true });
 		}
 	}
 
@@ -156,7 +176,7 @@ export class ExercisePickerModal extends Modal {
 		else if (entry.exerciseType === "duration") label = `⏲ ${entry.name}`;
 		else label = entry.name;
 		item.textContent = label;
-		item.addEventListener("click", () => {
+		makeActivatable(item, () => {
 			this.onSelect(entry.name, entry.exerciseType ?? "weight");
 			this.close();
 		});
@@ -172,7 +192,7 @@ export class ExercisePickerModal extends Modal {
 			cls: "ln-catalog-meta",
 			text: `${exercise.target} · ${exercise.equipment}`,
 		});
-		item.addEventListener("click", () => {
+		makeActivatable(item, () => {
 			this.onSelect(exercise.name, exercise.exerciseType, "catalog");
 			this.close();
 		});
@@ -183,7 +203,7 @@ export class ExercisePickerModal extends Modal {
 			cls: "ln-exercise-result ln-exercise-create",
 			text: `+ Create "${name}"`,
 		});
-		weightEl.addEventListener("click", () => {
+		makeActivatable(weightEl, () => {
 			this.onSelect(name, "weight");
 			this.close();
 		});
@@ -192,7 +212,7 @@ export class ExercisePickerModal extends Modal {
 			cls: "ln-exercise-result ln-exercise-create ln-exercise-create-timer",
 			text: `⏱ Create "${name}" as timer`,
 		});
-		timerEl.addEventListener("click", () => {
+		makeActivatable(timerEl, () => {
 			this.onSelect(name, "timer");
 			this.close();
 		});
@@ -201,7 +221,7 @@ export class ExercisePickerModal extends Modal {
 			cls: "ln-exercise-result ln-exercise-create ln-exercise-create-duration",
 			text: `⏲ Create "${name}" as duration (max-hold)`,
 		});
-		durationEl.addEventListener("click", () => {
+		makeActivatable(durationEl, () => {
 			this.onSelect(name, "duration");
 			this.close();
 		});

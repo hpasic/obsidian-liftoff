@@ -72,6 +72,8 @@ export interface LiftOffSettings {
 	holdBufferSeconds: number;
 	/** Keep the screen on while any timer, hold, or rest timer is running. */
 	keepScreenAwake: boolean;
+	/** Open "What's new" after an update. */
+	showWhatsNew: boolean;
 	exerciseLibrary: ExerciseLibraryEntry[];
 }
 
@@ -85,5 +87,6 @@ export const DEFAULT_SETTINGS: LiftOffSettings = {
 	defaultRestIntervalDuration: 20,
 	holdBufferSeconds: 5,
 	keepScreenAwake: true,
+	showWhatsNew: true,
 	exerciseLibrary: [],
 };

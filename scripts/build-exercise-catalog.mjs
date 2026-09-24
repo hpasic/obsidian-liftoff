@@ -86,7 +86,20 @@ for (const raw of dataset) {
 	});
 }
 
-rows.sort((a, b) => a.name.localeCompare(b.name));
+/**
+ * Unicode code-point order. Not localeCompare: that follows the machine's
+ * locale/ICU, so regenerating elsewhere could reorder rows.
+ */
+function compareCodePoints(a, b) {
+	const x = Array.from(a, (ch) => ch.codePointAt(0));
+	const y = Array.from(b, (ch) => ch.codePointAt(0));
+	for (let i = 0; i < Math.min(x.length, y.length); i++) {
+		if (x[i] !== y[i]) return x[i] - y[i];
+	}
+	return x.length - y.length;
+}
+
+rows.sort((a, b) => compareCodePoints(a.name, b.name));
 
 for (const row of rows) {
 	if (/[|\n\t]/.test(row.name)) throw new Error(`name breaks the row encoding: ${row.name}`);

@@ -28,3 +28,19 @@ describe("hold buffer setting", () => {
 		expect(item).toMatchObject({ control: { type: "number", min: 0, max: 60 } });
 	});
 });
+
+describe("what's new setting", () => {
+	it("shows a default-on toggle", async () => {
+		const { plugin, tab } = setup();
+		expect(plugin.settings.showWhatsNew).toBe(true);
+		const defs = tab.getSettingDefinitions();
+		expect(defs).toContainEqual(expect.objectContaining({
+			name: "Show what's new after updates",
+			control: { type: "toggle", key: "showWhatsNew" },
+		}));
+		await tab.setControlValue("showWhatsNew", false);
+		expect(plugin.settings.showWhatsNew).toBe(false);
+		expect(plugin.settings).not.toHaveProperty("lastSeenVersion");
+	});
+});
+

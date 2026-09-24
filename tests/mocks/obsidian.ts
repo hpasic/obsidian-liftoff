@@ -71,6 +71,33 @@ export class ItemView {
 	}
 }
 
+let apiVersion = "1.13.1";
+/** Test hook: pretend to run on another Obsidian version. */
+export function setApiVersion(version: string): void { apiVersion = version; }
+export function requireApiVersion(version: string): boolean {
+	const have = apiVersion.split(".").map(Number);
+	const need = version.split(".").map(Number);
+	for (let i = 0; i < Math.max(have.length, need.length); i++) {
+		const diff = (have[i] ?? 0) - (need[i] ?? 0);
+		if (diff !== 0) return diff > 0;
+	}
+	return true;
+}
+
+export class Component {
+	loaded = false;
+	load(): void { this.loaded = true; }
+	unload(): void { this.loaded = false; }
+}
+
+export const MarkdownRenderer = {
+	// Stand-in renderer: keeps the markdown source visible for assertions
+	render(_app: unknown, markdown: string, el: HTMLElement): Promise<void> {
+		el.createDiv({ cls: "markdown-rendered", text: markdown });
+		return Promise.resolve();
+	},
+};
+
 export class Modal {
 	modalEl = createEl("div", { cls: "modal" });
 	contentEl = this.modalEl.createDiv({ cls: "modal-content" });

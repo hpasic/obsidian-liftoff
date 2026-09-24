@@ -67,6 +67,11 @@ export class LiftOffSettingTab extends PluginSettingTab {
 				control: { type: "toggle", key: "keepScreenAwake" },
 			},
 			{
+				name: "Show what's new after updates",
+				desc: "After an update, show what changed since the version you last used",
+				control: { type: "toggle", key: "showWhatsNew" },
+			},
+			{
 				type: "group",
 				heading: "Timer exercises",
 				items: [
@@ -138,8 +143,9 @@ export class LiftOffSettingTab extends PluginSettingTab {
 				break;
 			}
 			case "keepScreenAwake":
+			case "showWhatsNew":
 				if (typeof value !== "boolean") return;
-				settings.keepScreenAwake = value;
+				settings[key] = value;
 				break;
 			default:
 				return;
@@ -247,6 +253,16 @@ export class LiftOffSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.keepScreenAwake).onChange(async (value) => {
 					this.plugin.settings.keepScreenAwake = value;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Show what's new after updates")
+			.setDesc("After an update, show what changed since the version you last used")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.showWhatsNew).onChange(async (value) => {
+					this.plugin.settings.showWhatsNew = value;
 					await this.plugin.saveSettings();
 				})
 			);
