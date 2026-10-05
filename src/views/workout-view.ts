@@ -556,15 +556,18 @@ export class WorkoutView extends ItemView {
 		// ("skipped, shoulder pain") shows up next session.
 		const collected = this.collectWorkout();
 		const completedExercises = collected.exercises
-			.filter((e) => e.sets.some((s) => s.completed) || !!e.note?.trim())
-			.map((e): Exercise => {
+			.map((e, i): Exercise => {
 				const sets = e.sets.filter((s) => s.completed);
 				if (e.exerciseType === "timer" && sets.length === 0) {
+					if (this.exerciseCards[i]?.hasUnfinishedTimer()) {
+						return { ...e, sets, note: [e.note?.trim(), "Timer stopped early."].filter(Boolean).join("\n") };
+					}
 					// Never run: drop the config so the note can't pass for a completed timer
 					return { name: e.name, exerciseType: "timer", sets, note: e.note };
 				}
 				return { ...e, sets };
-			});
+			})
+			.filter((e) => e.sets.length > 0 || !!e.note?.trim());
 
 		if (completedExercises.length === 0) {
 			new Notice("No completed sets or notes to save.");

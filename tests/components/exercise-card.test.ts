@@ -9,6 +9,20 @@ import { click, element, exercise, input, trackIntervals, workoutSet } from "../
 // Hold timing without the get-set buffer; buffer behaviour has its own tests
 const SETTINGS = { ...DEFAULT_SETTINGS, holdBufferSeconds: 0 };
 
+describe("ExerciseCard weight units", () => {
+	it("uses the settings unit for an empty set even if it carries an old unit", () => {
+		const data = exercise("Bench");
+		const card = new ExerciseCard(document.body, data, null, { ...SETTINGS, weightUnit: "lbs" }, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const root = card.getRootEl();
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("lbs");
+		input(root, ".ln-weight-input", "100");
+		click(root, ".ln-set-check");
+		expect(data.sets[0]).toMatchObject({ weight: 100, unit: "lbs", completed: true });
+		card.destroy();
+	});
+});
+
 function expectDurationSets(card: ExerciseCard, rows: DurationSetRow[], sets: WorkoutSet[]) {
 	// Read-only inspection: all mutations go through the real DOM handlers.
 	const actualRows = card["setRows"];

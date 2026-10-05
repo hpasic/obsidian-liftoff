@@ -3,6 +3,7 @@ import { TFile, TFolder, type App } from "obsidian";
 import { WorkoutStore } from "../../src/storage/workout-store";
 import { workoutToFrontmatter } from "../../src/utils/frontmatter";
 import { DEFAULT_SETTINGS, type Workout } from "../../src/types";
+import { findLastSetsForExercise } from "../../src/utils/history";
 
 /** Just enough YAML for what workoutToFrontmatter writes: scalars, quoted strings, flow maps. */
 function scalar(raw: string): unknown {
@@ -59,6 +60,15 @@ const base: Workout = {
 };
 
 describe("WorkoutStore.parseWorkoutFile round-trip", () => {
+	it("keeps a stopped-early timer's config and marker through markdown and parsing", () => {
+		const timer = {
+			name: "Tabata", exerciseType: "timer" as const, sets: [],
+			note: "feeling tired\nTimer stopped early.",
+			workSeconds: 40, restSeconds: 20, transitionSeconds: 5, intervals: 3,
+		};
+		expect(roundTrip({ ...base, exercises: [timer] })?.exercises).toEqual([timer]);
+	});
+
 	it("keeps weight and unit on weighted holds and defaults unweighted ones to 0", () => {
 		const parsed = roundTrip({
 			...base,
@@ -112,6 +122,40 @@ describe("WorkoutStore.parseWorkoutFile round-trip", () => {
 });
 
 describe("WorkoutStore.getRecentWorkouts", () => {
+	it.each([
+		["08:00", "18:00"],
+		[undefined, undefined],
+		["invalid", "invalid"],
+	] as const)("uses later same-day session for history (start: %s / %s)", (earlyStart, lateStart) => {
+		const early: Workout = {
+			...base, start: "08:00",
+			exercises: [{ name: "Bench", sets: [{ weight: 80, reps: 5, unit: "kg", completed: true }] }],
+		};
+		const late: Workout = {
+			...early, start: "18:00",
+			exercises: [{ name: "Bench", sets: [{ weight: 90, reps: 5, unit: "kg", completed: true }] }],
+		};
+		const files = [early, late].map((workout, i) => Object.assign(new TFile(), {
+			path: `Workouts/${i}.md`, basename: String(i),
+			stat: { mtime: new Date(`${workout.date}T${workout.start}`).getTime() },
+		}));
+		const frontmatter = [early, late].map((workout, i) => ({
+			...parseFrontmatter(workoutToFrontmatter(workout)), start: [earlyStart, lateStart][i],
+		}));
+		// Valid start times must win even when the morning note was edited later.
+		if (earlyStart === "08:00") files[0]!.stat.mtime = files[1]!.stat.mtime + 1000;
+		const folder = Object.assign(new TFolder(), { children: files });
+		const app = {
+			vault: { getAbstractFileByPath: (path: string) => path === "Workouts" ? folder : files.find((f) => f.path === path) },
+			metadataCache: { getFileCache: (file: TFile) => ({ frontmatter: frontmatter[files.indexOf(file)] }) },
+		} as unknown as App;
+		const store = new WorkoutStore(app, () => DEFAULT_SETTINGS);
+		expect(store.getRecentWorkouts().map((w) => w.path)).toEqual([files[1]!.path, files[0]!.path]);
+		expect(store.getRecentWorkouts(1)[0]!.path).toBe(files[1]!.path);
+		const history = store.getRecentWorkouts().map((w) => store.parseWorkoutFile(w.path)!);
+		expect(findLastSetsForExercise(history, "Bench")?.sets[0]!.weight).toBe(90);
+	});
+
 	it("counts only exercises that logged something, not note-only ones", () => {
 		const { store } = storeFor({
 			...base,

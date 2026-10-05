@@ -42,7 +42,7 @@ export function workoutToFrontmatter(workout: Workout): string {
 		if (exercise.exerciseType === "timer") {
 			lines.push(`    exerciseType: timer`);
 			// A timer that was never run is saved for its note only — no config,
-			// so "timer config in a note" keeps meaning it was completed
+			// so config in a saved note means the timer was started
 			if (exercise.workSeconds === undefined) continue;
 			lines.push(`    workSeconds: ${exercise.workSeconds}`);
 			lines.push(`    restSeconds: ${exercise.restSeconds ?? 0}`);

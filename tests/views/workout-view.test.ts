@@ -6,6 +6,7 @@ import { WorkoutView } from "../../src/views/workout-view";
 import { DEFAULT_SETTINGS, type Exercise, type Workout } from "../../src/types";
 import { DurationSetRow } from "../../src/components/duration-set-row";
 import { screenWakeLock } from "../../src/utils/wake-lock";
+import { workoutToFullMarkdown } from "../../src/utils/frontmatter";
 import { click, element, exercise, input, menuAction, trackIntervals } from "../helpers/dom";
 
 const views: WorkoutView[] = [];
@@ -309,6 +310,27 @@ async function finish(root: HTMLElement) {
 }
 
 describe("WorkoutView finish", () => {
+	it.each([
+		[false, "feeling tired"],
+		[true, undefined],
+	] as const)("keeps config and marks a started timer stopped early (paused: %s)", async (paused, note) => {
+		const timer = { ...exercise("Tabata", "timer"), transitionSeconds: 5 };
+		const { root, plugin } = setup([timer]);
+		click(root, ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(15_000); // Count-in finished; first work interval still running
+		if (note) input(root, ".ln-exercise-note-input", note);
+		if (paused) click(root, ".ln-timer-block-control-btn");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		const expectedNote = note ? `${note}\nTimer stopped early.` : "Timer stopped early.";
+		expect(saved.exercises).toEqual([{ ...timer, sets: [], note: expectedNote }]);
+		const markdown = workoutToFullMarkdown(saved);
+		expect(markdown).toContain("> Timer stopped early.");
+		expect(markdown).toContain("Intervals: 3 × 0:40 work / 0:20 rest / 0:05 switch");
+		expect(markdown).not.toContain("_Not started._");
+		expect(timer.note).toBe(note); // Save leaves the live note untouched
+	});
+
 	it("keeps an exercise with a note even when none of its sets was completed", async () => {
 		const skipped = { ...exercise("Bench"), note: "skipped, shoulder pain" };
 		const done = exercise("Row");
@@ -354,6 +376,36 @@ describe("WorkoutView finish", () => {
 });
 
 describe("WorkoutView history auto-fill", () => {
+	it.each(["template", "added"] as const)("keeps kg weights displayed, edited and copied in kg with lbs settings (%s)", async (source) => {
+		const weightHistory: Workout[] = [{
+			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
+			exercises: [{ name: "Bench", sets: [{ weight: 80, reps: 5, unit: "kg", completed: true }] }],
+		}];
+		const { view, root, plugin } = setup([], weightHistory);
+		plugin.settings.weightUnit = "lbs";
+		if (source === "template") {
+			view.startFromTemplate({
+				type: "workout-template", name: "Push", exercises: [{ name: "Bench", targetSets: 1 }],
+			});
+		} else {
+			add(root, "Bench");
+		}
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("kg");
+		expect(element(root, ".ln-weight-input").getAttribute("aria-label")).toBe("Weight (kg)");
+		expect(element<HTMLInputElement>(root, ".ln-weight-input").value).toBe("80");
+		input(root, ".ln-weight-input", "82.5");
+		click(root, ".ln-set-check");
+		click(root, ".ln-add-set-btn");
+		const rows = root.querySelectorAll(".ln-sets-container .ln-set-row");
+		expect(element(rows[1]!, ".ln-set-weight-unit").textContent).toBe("kg");
+		expect(element<HTMLInputElement>(rows[1]!, ".ln-weight-input").value).toBe("82.5");
+		input(rows[1]!, ".ln-reps-input", "4");
+		click(rows[1]!, ".ln-set-check");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises[0]!.sets.map((s) => [s.weight, s.unit])).toEqual([[82.5, "kg"], [82.5, "kg"]]);
+	});
+
 	const history: Workout[] = [{
 		type: "workout", template: "Grip", date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
 		exercises: [{

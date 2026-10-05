@@ -532,6 +532,25 @@
 	outline: 2px solid var(--interactive-accent);
 }
 
+.ln-set-weight {
+	position: relative;
+	min-width: 0;
+}
+
+.ln-exercise-card .ln-set-weight .ln-weight-input {
+	padding-right: 28px;
+}
+
+.ln-set-weight-unit {
+	position: absolute;
+	right: 6px;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 10px;
+	color: var(--text-faint);
+	pointer-events: none;
+}
+
 .ln-set-input::-webkit-outer-spin-button,
 .ln-set-input::-webkit-inner-spin-button {
 	-webkit-appearance: none;
