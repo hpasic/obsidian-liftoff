@@ -4,7 +4,7 @@ All notable changes to LiftOff. Newest first; each release has a `## <version> -
 
 ## 0.5.2 - 2026-10-05
 
-- Finishing a workout while an interval timer is still running or paused now keeps the timer's settings and adds "Timer stopped early." to its note, instead of saving it as not started.
+- Finishing a workout after an interval timer's "Get ready" count-in, while it is still running or paused, now keeps the timer's settings and adds "Timer stopped early." to its note, instead of saving it as not started.
 - Two workouts on the same day are ordered by start time, so the later session's numbers and note fill in next time.
 - Each weight row shows its own unit, so a weight carried over in kg stays kg even when your default unit is lbs.
 - LiftOff now has a Donate button in Community Plugins. If it helps your training, [buy me a coffee on Ko-fi](https://ko-fi.com/hpasic).
