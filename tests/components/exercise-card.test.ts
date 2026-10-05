@@ -9,6 +9,33 @@ import { click, element, exercise, input, trackIntervals, workoutSet } from "../
 // Hold timing without the get-set buffer; buffer behaviour has its own tests
 const SETTINGS = { ...DEFAULT_SETTINGS, holdBufferSeconds: 0 };
 
+describe("ExerciseCard weight units", () => {
+	it("preserves an existing empty set's unit when it differs from settings", () => {
+		const data = exercise("Bench");
+		const card = new ExerciseCard(document.body, data, null, { ...SETTINGS, weightUnit: "lbs" }, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const root = card.getRootEl();
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("kg");
+		input(root, ".ln-weight-input", "100");
+		click(root, ".ln-set-check");
+		expect(data.sets[0]).toMatchObject({ weight: 100, unit: "kg", completed: true });
+		card.destroy();
+	});
+
+	it("creates an empty added set in the settings unit while preserving the cleared set's unit", () => {
+		const data = exercise("Bench");
+		data.sets[0]!.weight = 80;
+		const card = new ExerciseCard(document.body, data, null, { ...SETTINGS, weightUnit: "lbs" }, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const root = card.getRootEl();
+		input(root, ".ln-weight-input", "");
+		click(root, ".ln-add-set-btn");
+		expect(data.sets.map((set) => [set.weight, set.unit])).toEqual([[0, "kg"], [0, "lbs"]]);
+		expect(Array.from(root.querySelectorAll(".ln-set-weight-unit"), (el) => el.textContent)).toEqual(["kg", "lbs"]);
+		card.destroy();
+	});
+});
+
 function expectDurationSets(card: ExerciseCard, rows: DurationSetRow[], sets: WorkoutSet[]) {
 	// Read-only inspection: all mutations go through the real DOM handlers.
 	const actualRows = card["setRows"];

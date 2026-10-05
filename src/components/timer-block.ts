@@ -328,6 +328,10 @@ export class TimerBlock {
 		};
 	}
 
+	hasUnfinishedRun(): boolean {
+		return this.runPhase !== "countdown" && (this.phase === "running" || this.phase === "paused");
+	}
+
 	destroy(): void {
 		this.stopInterval();
 		this.wakeLock.drop();

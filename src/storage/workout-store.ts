@@ -54,6 +54,7 @@ export class WorkoutStore {
 		}
 
 		const workouts: RecentWorkout[] = [];
+		const startTimes = new Map<string, number>();
 
 		for (const file of folder.children) {
 			if (!(file instanceof TFile) || file.extension !== "md") continue;
@@ -62,11 +63,15 @@ export class WorkoutStore {
 			const fm = cache?.frontmatter;
 			if (!fm || fm.type !== "workout") continue;
 
+			const date = (fm.date as string) ?? file.basename.substring(0, 10);
+			const startTime = typeof fm.start === "string" ? Date.parse(`${date}T${fm.start}`) : NaN;
+			startTimes.set(file.path, Number.isFinite(startTime) ? startTime : file.stat.mtime);
+
 			workouts.push({
 				filename: file.basename,
 				path: file.path,
 				template: (fm.template as string) ?? null,
-				date: (fm.date as string) ?? file.basename.substring(0, 10),
+				date,
 				duration: (fm.duration as number) ?? null,
 				exerciseCount: Array.isArray(fm.exercises)
 					? (fm.exercises as Array<Record<string, unknown>>).filter(loggedSomething).length
@@ -74,7 +79,7 @@ export class WorkoutStore {
 			});
 		}
 
-		workouts.sort((a, b) => b.date.localeCompare(a.date));
+		workouts.sort((a, b) => b.date.localeCompare(a.date) || startTimes.get(b.path)! - startTimes.get(a.path)!);
 		return workouts.slice(0, limit);
 	}
 

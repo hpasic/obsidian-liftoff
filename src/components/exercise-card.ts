@@ -324,7 +324,7 @@ export class ExerciseCard {
 		// Column headers
 		const colHeaders = this.containerEl.createDiv({ cls: "ln-set-row ln-set-header" });
 		colHeaders.createSpan({ cls: "ln-set-number", text: "SET" });
-		colHeaders.createSpan({ cls: "ln-set-input", text: this.settings.weightUnit.toUpperCase() });
+		colHeaders.createSpan({ cls: "ln-set-input", text: "WEIGHT" });
 		colHeaders.createSpan({ cls: "ln-set-input", text: "REPS" });
 
 		// Previous hint
@@ -332,7 +332,7 @@ export class ExerciseCard {
 			const lastSet = this.lastData.sets[this.lastData.sets.length - 1]!;
 			this.containerEl.createDiv({
 				cls: "ln-exercise-previous",
-				text: `Previous: ${lastSet.weight} x ${lastSet.reps}`,
+				text: `Previous: ${lastSet.weight} ${lastSet.unit} x ${lastSet.reps}`,
 			});
 		}
 
@@ -350,7 +350,7 @@ export class ExerciseCard {
 			const newSet: WorkoutSet = {
 				weight: lastSet?.weight ?? 0,
 				reps: 0,
-				unit: this.settings.weightUnit,
+				unit: lastSet && lastSet.weight > 0 ? lastSet.unit : this.settings.weightUnit,
 				completed: false,
 			};
 			this.exercise.sets.push(newSet);
@@ -478,6 +478,10 @@ export class ExerciseCard {
 	 */
 	getExercise(): Exercise {
 		return this.exercise;
+	}
+
+	hasUnfinishedTimer(): boolean {
+		return this.timerBlock?.hasUnfinishedRun() ?? false;
 	}
 
 	destroy(): void {

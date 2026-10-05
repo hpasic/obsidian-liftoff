@@ -167,7 +167,7 @@ export class WorkoutView extends ItemView {
 					if (prev) {
 						exercise.sets[i]!.weight = prev.weight;
 						exercise.sets[i]!.reps = prev.reps;
-						exercise.sets[i]!.unit = prev.unit;
+						exercise.sets[i]!.unit = prev.weight > 0 ? prev.unit : this.plugin.settings.weightUnit;
 						if (prev.setType) exercise.sets[i]!.setType = prev.setType;
 					}
 				}
@@ -466,6 +466,7 @@ export class WorkoutView extends ItemView {
 			if (lastData && lastData.sets.length > 0) {
 				newExercise.sets = lastData.sets.map((s) => ({
 					...s,
+					unit: s.weight > 0 ? s.unit : this.plugin.settings.weightUnit,
 					completed: false,
 				}));
 			}
@@ -556,15 +557,18 @@ export class WorkoutView extends ItemView {
 		// ("skipped, shoulder pain") shows up next session.
 		const collected = this.collectWorkout();
 		const completedExercises = collected.exercises
-			.filter((e) => e.sets.some((s) => s.completed) || !!e.note?.trim())
-			.map((e): Exercise => {
+			.map((e, i): Exercise => {
 				const sets = e.sets.filter((s) => s.completed);
 				if (e.exerciseType === "timer" && sets.length === 0) {
+					if (this.exerciseCards[i]?.hasUnfinishedTimer()) {
+						return { ...e, sets, note: [e.note?.trim(), "Timer stopped early."].filter(Boolean).join("\n") };
+					}
 					// Never run: drop the config so the note can't pass for a completed timer
 					return { name: e.name, exerciseType: "timer", sets, note: e.note };
 				}
 				return { ...e, sets };
-			});
+			})
+			.filter((e) => e.sets.length > 0 || !!e.note?.trim());
 
 		if (completedExercises.length === 0) {
 			new Notice("No completed sets or notes to save.");

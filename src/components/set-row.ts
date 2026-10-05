@@ -24,6 +24,7 @@ export class SetRow {
 	private repsInput: HTMLInputElement;
 	private checkBtn: HTMLButtonElement;
 	private set: WorkoutSet;
+	private readonly weightUnit: "kg" | "lbs";
 
 	constructor(
 		parentEl: HTMLElement,
@@ -33,6 +34,7 @@ export class SetRow {
 		private callbacks: SetRowCallbacks
 	) {
 		this.set = { ...set };
+		this.weightUnit = set.unit;
 		this.containerEl = parentEl.createDiv({ cls: "ln-set-row" });
 		this.weightInput = null!;
 		this.repsInput = null!;
@@ -64,15 +66,18 @@ export class SetRow {
 		});
 
 		// Weight input
-		this.weightInput = this.containerEl.createEl("input", {
+		const weightEl = this.containerEl.createDiv({ cls: "ln-set-weight" });
+		this.weightInput = weightEl.createEl("input", {
 			cls: "ln-set-input ln-weight-input",
 			attr: {
 				type: "text",
 				inputmode: "decimal",
 				pattern: "[0-9]*[.,]?[0-9]*",
+				"aria-label": `Weight (${this.weightUnit})`,
 				placeholder: this.previousHint?.split("x")[0]?.trim() ?? "",
 			},
 		});
+		weightEl.createSpan({ cls: "ln-set-weight-unit", text: this.weightUnit });
 		if (this.set.weight > 0) {
 			this.weightInput.value = String(this.set.weight);
 		}

@@ -1,9 +1,10 @@
 {
 	"id": "liftoff",
 	"name": "LiftOff",
-	"version": "0.5.1",
+	"version": "0.5.2",
 	"minAppVersion": "1.7.2",
 	"description": "Mobile-first gym workout tracker. Log sets, reps, and weights with speed-optimized UX. Data stored as markdown in your vault.",
 	"author": "Haris Pasic",
+	"fundingUrl": "https://ko-fi.com/hpasic",
 	"isDesktopOnly": false
 }
