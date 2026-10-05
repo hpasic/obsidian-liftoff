@@ -310,6 +310,33 @@ async function finish(root: HTMLElement) {
 }
 
 describe("WorkoutView finish", () => {
+	it.each([false, true])("does not save a timer finished during count-in without a note (paused: %s)", async (paused) => {
+		const { root, plugin } = setup([exercise("Tabata", "timer")]);
+		click(root, ".ln-timer-block-start-btn");
+		if (paused) click(root, ".ln-timer-block-control-btn");
+		await finish(root);
+		expect(plugin.workoutStore.saveWorkout).not.toHaveBeenCalled();
+		expect(plugin.clearActiveWorkout).not.toHaveBeenCalled();
+	});
+
+	it.each([false, true])("saves a timer finished during count-in with a note as not started (paused: %s)", async (paused) => {
+		const timer = { ...exercise("Tabata", "timer"), transitionSeconds: 5 };
+		const { root, plugin } = setup([timer]);
+		click(root, ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(9_000); // Still in count-in, just before the first work phase
+		input(root, ".ln-exercise-note-input", "ran out of time");
+		if (paused) click(root, ".ln-timer-block-control-btn");
+		await finish(root);
+		expect(plugin.workoutStore.saveWorkout).toHaveBeenCalledTimes(1);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: "ran out of time" }]);
+		const markdown = workoutToFullMarkdown(saved);
+		expect(markdown).toContain("_Not started._");
+		expect(markdown).not.toContain("Timer stopped early.");
+		expect(markdown).not.toContain("Intervals:");
+		expect(timer.workSeconds).toBe(40); // Saving leaves the live config untouched
+	});
+
 	it.each([
 		[false, "feeling tired"],
 		[true, undefined],
