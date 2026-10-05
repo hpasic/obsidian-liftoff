@@ -92,6 +92,10 @@ After an update, LiftOff shows what's new since the version you last used on tha
 3. Copy the downloaded files into that folder
 4. Enable the plugin in Settings > Community Plugins
 
+## Support
+
+LiftOff is free and built in my spare time. If it helps your training, you can [buy me a coffee on Ko-fi](https://ko-fi.com/hpasic) ☕
+
 ## Credits
 
 The built-in exercise catalog is generated from the MIT-licensed [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) by Hasan Emir Yıldırım — text fields only, no media. See [`src/data/EXERCISE-DATASET-LICENSE.md`](src/data/EXERCISE-DATASET-LICENSE.md).
