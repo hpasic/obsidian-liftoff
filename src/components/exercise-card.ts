@@ -406,8 +406,7 @@ export class ExerciseCard {
 						this.render();
 						this.notifyChanged();
 					},
-				},
-				this.settings.weightUnit
+				}
 			);
 			this.setRows.push(row);
 

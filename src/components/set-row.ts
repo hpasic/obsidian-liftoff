@@ -31,12 +31,10 @@ export class SetRow {
 		private setNumber: number,
 		set: WorkoutSet,
 		private previousHint: string | null,
-		private callbacks: SetRowCallbacks,
-		weightUnit: "kg" | "lbs" = set.unit
+		private callbacks: SetRowCallbacks
 	) {
 		this.set = { ...set };
-		this.weightUnit = set.weight > 0 ? set.unit : weightUnit;
-		this.set.unit = this.weightUnit;
+		this.weightUnit = set.unit;
 		this.containerEl = parentEl.createDiv({ cls: "ln-set-row" });
 		this.weightInput = null!;
 		this.repsInput = null!;

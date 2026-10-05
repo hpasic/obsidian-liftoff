@@ -167,7 +167,7 @@ export class WorkoutView extends ItemView {
 					if (prev) {
 						exercise.sets[i]!.weight = prev.weight;
 						exercise.sets[i]!.reps = prev.reps;
-						exercise.sets[i]!.unit = prev.unit;
+						exercise.sets[i]!.unit = prev.weight > 0 ? prev.unit : this.plugin.settings.weightUnit;
 						if (prev.setType) exercise.sets[i]!.setType = prev.setType;
 					}
 				}
@@ -466,6 +466,7 @@ export class WorkoutView extends ItemView {
 			if (lastData && lastData.sets.length > 0) {
 				newExercise.sets = lastData.sets.map((s) => ({
 					...s,
+					unit: s.weight > 0 ? s.unit : this.plugin.settings.weightUnit,
 					completed: false,
 				}));
 			}

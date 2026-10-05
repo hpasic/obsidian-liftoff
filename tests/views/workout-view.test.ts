@@ -376,6 +376,56 @@ describe("WorkoutView finish", () => {
 });
 
 describe("WorkoutView history auto-fill", () => {
+	it.each(["template", "added"] as const)("creates zero-weight history sets in the settings unit (%s)", async (source) => {
+		const history: Workout[] = [{
+			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
+			exercises: [{ name: "Dips", sets: [{ weight: 0, reps: 5, unit: "kg", completed: true }] }],
+		}];
+		const { view, root, plugin } = setup([], history);
+		plugin.settings.weightUnit = "lbs";
+		if (source === "template") {
+			view.startFromTemplate({
+				type: "workout-template", name: "Push", exercises: [{ name: "Dips", targetSets: 2 }],
+			});
+		} else {
+			add(root, "Dips");
+		}
+		expect(view["exerciseCards"][0]!.getExercise().sets.every((set) => set.unit === "lbs")).toBe(true);
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("lbs");
+		input(root, ".ln-weight-input", "10");
+		click(root, ".ln-set-check");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises[0]!.sets).toEqual([{ weight: 10, reps: 5, unit: "lbs", completed: true }]);
+		expect(history[0]!.exercises[0]!.sets[0]!.unit).toBe("kg");
+	});
+
+	it("saves a carried-over kg set in kg after clearing its weight and removing the other set", async () => {
+		const history: Workout[] = [{
+			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
+			exercises: [{ name: "Bench", sets: [
+				{ weight: 80, reps: 5, unit: "kg", completed: true },
+				{ weight: 80, reps: 5, unit: "kg", completed: true },
+			] }],
+		}];
+		const { view, root, plugin } = setup([], history);
+		plugin.settings.weightUnit = "lbs";
+		view.startFromTemplate({
+			type: "workout-template", name: "Push", exercises: [{ name: "Bench", targetSets: 2 }],
+		});
+		expect(Array.from(root.querySelectorAll(".ln-set-weight-unit"), (el) => el.textContent)).toEqual(["kg", "kg"]);
+		input(root, ".ln-weight-input", "");
+		const rows = root.querySelectorAll(".ln-sets-container .ln-set-row");
+		click(rows[1]!, ".ln-set-remove");
+		input(root, ".ln-weight-input", "82.5");
+		click(root, ".ln-set-check");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises[0]!.sets).toEqual([{ weight: 82.5, reps: 5, unit: "kg", completed: true }]);
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("kg");
+		expect(element(root, ".ln-weight-input").getAttribute("aria-label")).toBe("Weight (kg)");
+	});
+
 	it.each(["template", "added"] as const)("keeps kg weights displayed, edited and copied in kg with lbs settings (%s)", async (source) => {
 		const weightHistory: Workout[] = [{
 			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
