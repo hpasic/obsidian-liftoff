@@ -332,7 +332,9 @@ export class ExerciseCard {
 			const lastSet = this.lastData.sets[this.lastData.sets.length - 1]!;
 			this.containerEl.createDiv({
 				cls: "ln-exercise-previous",
-				text: `Previous: ${lastSet.weight} ${lastSet.unit} x ${lastSet.reps}`,
+				text: lastSet.weight > 0
+					? `Previous: ${lastSet.weight} ${lastSet.unit} x ${lastSet.reps}`
+					: `Previous: ${lastSet.reps} reps`,
 			});
 		}
 
@@ -365,16 +367,13 @@ export class ExerciseCard {
 
 		for (let i = 0; i < this.exercise.sets.length; i++) {
 			const set = this.exercise.sets[i]!;
-			const previousSet = this.lastData?.sets[i];
-			const hint = previousSet
-				? `${previousSet.weight} x ${previousSet.reps}`
-				: null;
+			const previousSet = this.lastData?.sets[i] ?? null;
 
 			const row = new SetRow(
 				this.setsContainerEl,
 				i + 1,
 				set,
-				hint,
+				previousSet,
 				{
 					onSetChanged: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;

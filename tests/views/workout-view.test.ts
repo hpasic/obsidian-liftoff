@@ -464,6 +464,29 @@ describe("WorkoutView history auto-fill", () => {
 		expect(element(root, ".ln-weight-input").getAttribute("aria-label")).toBe("Weight (kg)");
 	});
 
+	it("saves a toggled unit with the typed weight and auto-fills it next time", async () => {
+		const history: Workout[] = [{
+			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
+			exercises: [{ name: "Bench", sets: [{ weight: 225, reps: 5, unit: "kg", completed: true }] }],
+		}];
+		const { view, root, plugin } = setup([], history);
+		add(root, "Bench");
+		click(root, ".ln-set-weight-unit");
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("lbs");
+		expect(element<HTMLInputElement>(root, ".ln-weight-input").value).toBe("225");
+		click(root, ".ln-set-check");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises[0]!.sets).toEqual([{ weight: 225, reps: 5, unit: "lbs", completed: true }]);
+
+		history.unshift({ ...saved, date: "2026-09-21" });
+		view.startFromTemplate({
+			type: "workout-template", name: "Push", exercises: [{ name: "Bench", targetSets: 1 }],
+		});
+		expect(view["exerciseCards"][0]!.getExercise().sets[0]).toMatchObject({ weight: 225, unit: "lbs" });
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("lbs");
+	});
+
 	it.each(["template", "added"] as const)("keeps kg weights displayed, edited and copied in kg with lbs settings (%s)", async (source) => {
 		const weightHistory: Workout[] = [{
 			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,

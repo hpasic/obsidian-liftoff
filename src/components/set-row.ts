@@ -24,13 +24,13 @@ export class SetRow {
 	private repsInput: HTMLInputElement;
 	private checkBtn: HTMLButtonElement;
 	private set: WorkoutSet;
-	private readonly weightUnit: "kg" | "lbs";
+	private weightUnit: "kg" | "lbs";
 
 	constructor(
 		parentEl: HTMLElement,
 		private setNumber: number,
 		set: WorkoutSet,
-		private previousHint: string | null,
+		private previous: WorkoutSet | null,
 		private callbacks: SetRowCallbacks
 	) {
 		this.set = { ...set };
@@ -74,10 +74,26 @@ export class SetRow {
 				inputmode: "decimal",
 				pattern: "[0-9]*[.,]?[0-9]*",
 				"aria-label": `Weight (${this.weightUnit})`,
-				placeholder: this.previousHint?.split("x")[0]?.trim() ?? "",
+				placeholder: this.weightPlaceholder(),
 			},
 		});
-		weightEl.createSpan({ cls: "ln-set-weight-unit", text: this.weightUnit });
+		// Tap to relabel the row kg <-> lbs; the typed number stays as the plate says
+		const unitBtn = weightEl.createEl("button", {
+			cls: "ln-set-weight-unit",
+			text: this.weightUnit,
+			attr: { type: "button", "aria-label": this.unitLabel() },
+		});
+		// Keep focus (and the keyboard) on the weight input while typing
+		unitBtn.addEventListener("mousedown", (e) => e.preventDefault());
+		unitBtn.addEventListener("click", () => {
+			this.weightUnit = this.weightUnit === "kg" ? "lbs" : "kg";
+			this.set.unit = this.weightUnit;
+			unitBtn.textContent = this.weightUnit;
+			unitBtn.setAttr("aria-label", this.unitLabel());
+			this.weightInput.setAttr("aria-label", `Weight (${this.weightUnit})`);
+			this.weightInput.setAttr("placeholder", this.weightPlaceholder());
+			this.callbacks.onSetChanged(this.set);
+		});
 		if (this.set.weight > 0) {
 			this.weightInput.value = String(this.set.weight);
 		}
@@ -92,7 +108,7 @@ export class SetRow {
 			attr: {
 				type: "number",
 				inputmode: "numeric",
-				placeholder: this.previousHint?.split("x")[1]?.trim() ?? "",
+				placeholder: this.previous ? String(this.previous.reps) : "",
 			},
 		});
 		if (this.set.reps > 0) {
@@ -125,6 +141,18 @@ export class SetRow {
 		removeBtn.addEventListener("click", () => {
 			this.callbacks.onSetRemoved();
 		});
+	}
+
+	private unitLabel(): string {
+		return `Unit ${this.weightUnit}. Tap to switch to ${this.weightUnit === "kg" ? "lbs" : "kg"}.`;
+	}
+
+	/** Previous weight; its unit only when it differs from this row's badge. */
+	private weightPlaceholder(): string {
+		const prev = this.previous;
+		if (!prev) return "";
+		if (prev.weight <= 0) return "0";
+		return prev.unit === this.weightUnit ? String(prev.weight) : `${prev.weight} ${prev.unit}`;
 	}
 
 	getSet(): WorkoutSet {

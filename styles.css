@@ -542,27 +542,48 @@
 	padding-right: 28px;
 }
 
-.ln-set-weight-unit {
+/* Tap target spanning the input's right edge; toggles the row kg <-> lbs */
+.ln-exercise-card .ln-set-weight .ln-set-weight-unit {
 	position: absolute;
-	right: 6px;
-	top: 50%;
-	transform: translateY(-50%);
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 28px;
+	height: auto;
+	min-height: 0;
+	margin: 0;
+	padding: 0 6px 0 0;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	border: none;
+	border-radius: 0 8px 8px 0;
+	background: transparent;
+	box-shadow: none;
 	font-size: 10px;
 	color: var(--text-faint);
-	pointer-events: none;
+	cursor: pointer;
 }
 
-/* Narrow columns put the unit below the number, leaving 40px of text space at 52px. */
+.ln-exercise-card .ln-set-weight .ln-set-weight-unit:active {
+	color: var(--interactive-accent);
+}
+
+/* Narrow columns put the unit below the number, leaving 44px of text space at 52px. */
 @container (max-width: 76px) {
 	.ln-exercise-card .ln-set-weight .ln-weight-input {
-		padding: 6px 6px 18px;
+		padding: 6px 4px 18px;
 	}
 
-	.ln-set-weight-unit {
-		right: 50%;
+	.ln-exercise-card .ln-set-weight .ln-set-weight-unit {
 		top: auto;
-		bottom: 4px;
-		transform: translateX(50%);
+		left: 0;
+		width: auto;
+		height: 20px;
+		padding: 0 0 4px;
+		align-items: flex-end;
+		justify-content: center;
+		border-radius: 0 0 8px 8px;
 		line-height: 10px;
 	}
 }
@@ -595,7 +616,8 @@
 	color: white;
 }
 
-.ln-set-row.ln-set-completed .ln-set-input {
+.ln-set-row.ln-set-completed .ln-set-input,
+.ln-set-row.ln-set-completed .ln-set-weight-unit {
 	opacity: 0.6;
 }
 
