@@ -99,7 +99,7 @@ describe("WorkoutView structure", () => {
 		expect(view["exerciseCards"][0]).toBe(second);
 		click(first!.getRootEl(), ".ln-exercise-menu-btn");
 		expect(Array.from(document.querySelectorAll(".menu button")).map((el) => el.textContent))
-			.toEqual(["Move up", "Remove exercise"]);
+			.toEqual(["Move up", "Change type\u2026", "Remove exercise"]);
 		click(document, ".menu button");
 		expect(view["exerciseCards"][0]).toBe(first);
 		menuAction(second!.getRootEl(), "Remove exercise");
@@ -160,6 +160,114 @@ describe("WorkoutView structure", () => {
 		await Promise.resolve();
 		expectParallel(view, workout, ["A", "C"]);
 		expect(card.getRootEl().isConnected).toBe(false);
+	});
+});
+
+async function changeType(card: HTMLElement, type: "weight" | "timer" | "duration") {
+	menuAction(card, "Change type…");
+	click(document, `.modal .ln-type-choice-btn[data-type="${type}"]`);
+	for (let i = 0; i < 3; i++) await Promise.resolve();
+}
+
+describe("WorkoutView change type", () => {
+	it("swaps a card with no completed sets to the timer block in place and updates the library", async () => {
+		const { view, workout, plugin } = setup([exercise("A"), exercise("Plank")]);
+		const card = view["exerciseCards"][1]!;
+		const root = card.getRootEl();
+		const live = card.getExercise();
+		await changeType(root, "timer");
+		expect(document.querySelector(".modal")).toBeNull(); // No confirm without completed sets
+		expect(view["exerciseCards"][1]).toBe(card);
+		expect(card.getRootEl()).toBe(root);
+		expect(card.getExercise()).toBe(live);
+		expect(workout.exercises[1]).toBe(live);
+		expect(live).toMatchObject({ exerciseType: "timer", sets: [], workSeconds: 40, intervals: 5 });
+		expect(card["timerBlock"]).not.toBeNull();
+		expect(root.querySelector(".ln-set-row:not(.ln-set-header)")).toBeNull();
+		expect(plugin.settings.exerciseLibrary).toEqual([{ name: "Plank", exerciseType: "timer" }]);
+		expect(plugin.saveSettings).toHaveBeenCalled();
+		expect(plugin.persistActiveWorkout).toHaveBeenCalled();
+	});
+
+	it("confirms before dropping completed sets, and keeps them on cancel", async () => {
+		const plank = exercise("Plank");
+		plank.sets = [
+			{ weight: 10, reps: 5, unit: "kg", completed: false },
+			{ weight: 10, reps: 5, unit: "kg", completed: false },
+		];
+		const { view, plugin } = setup([plank]);
+		const card = view["exerciseCards"][0]!;
+		click(card.getRootEl(), ".ln-set-check");
+
+		await changeType(card.getRootEl(), "duration");
+		expect(element(document, ".modal .ln-modal-message").textContent)
+			.toBe("Change \"Plank\" to duration? Its 1 completed set will be discarded.");
+		click(document, ".modal button:not(.mod-cta)");
+		await Promise.resolve();
+		expect(plank.exerciseType).toBe("weight");
+		expect(plank.sets.filter((s) => s.completed)).toHaveLength(1);
+		expect(plugin.settings.exerciseLibrary).toEqual([]);
+
+		await changeType(card.getRootEl(), "duration");
+		click(document, ".modal .mod-cta");
+		await Promise.resolve();
+		expect(plank.exerciseType).toBe("duration");
+		expect(plank.sets).toEqual([{ weight: 10, reps: 0, unit: "kg", completed: false, durationSeconds: 0 }]);
+		expect(card["setRows"][0]).toBeInstanceOf(DurationSetRow);
+		expect(plugin.settings.exerciseLibrary).toEqual([{ name: "Plank", exerciseType: "duration" }]);
+	});
+
+	it("leaves other cards' running timer, hold and the rest timer untouched", async () => {
+		const tracking = trackIntervals();
+		const { view, workout } = setup([exercise("Timer", "timer"), exercise("Hold", "duration"), exercise("Other"), exercise("Rest")]);
+		const [timerCard, holdCard, other, restOwner] = view["exerciseCards"];
+		const timer = timerCard!["timerBlock"]!;
+		const hold = holdCard!["setRows"][0] as DurationSetRow;
+		click(timerCard!.getRootEl(), ".ln-timer-block-start-btn");
+		click(hold.getRootEl(), ".ln-duration-action");
+		click(restOwner!.getRootEl(), ".ln-set-check");
+		vi.advanceTimersByTime(2000);
+		const ids = tracking.ids();
+
+		await changeType(other!.getRootEl(), "duration");
+		expectParallel(view, workout, ["Timer", "Hold", "Other", "Rest"]);
+		expect(other!.getExercise().exerciseType).toBe("duration");
+		expect(timerCard!["timerBlock"]).toBe(timer);
+		expect(holdCard!["setRows"][0]).toBe(hold);
+		expect(tracking.ids()).toEqual(ids);
+		expect(tracking.clear).not.toHaveBeenCalled();
+		const rest = element(view.containerEl, ".ln-rest-timer");
+		expect(rest.previousElementSibling).toBe(restOwner!.getRootEl());
+		vi.advanceTimersByTime(2000);
+		expect(element(timerCard!.getRootEl(), ".ln-timer-block-countdown").textContent).toBe("6");
+		expect(element(hold.getRootEl(), ".ln-duration-display").textContent).toBe("0:04");
+		expect(element(rest, ".ln-rest-timer-value").textContent).toBe("0:04");
+	});
+
+	it("confirms before stopping its own running timer, and tears down only that interval", async () => {
+		const tracking = trackIntervals();
+		const { view } = setup([exercise("Tabata", "timer")]);
+		const card = view["exerciseCards"][0]!;
+		click(card.getRootEl(), ".ln-timer-block-start-btn");
+		const timerId = tracking.ids().at(-1)!;
+		vi.advanceTimersByTime(15_000); // Past the count-in: a real run
+		await changeType(card.getRootEl(), "weight");
+		expect(element(document, ".modal .ln-modal-message").textContent)
+			.toBe("Change \"Tabata\" to weight? Its running timer will be stopped.");
+		click(document, ".modal .mod-cta");
+		await Promise.resolve();
+		expect(card.getExercise()).toEqual({ name: "Tabata", exerciseType: "weight", sets: [{ weight: 0, reps: 0, unit: "kg", completed: false }] });
+		tracking.expectClearedOnce([timerId]);
+		expect(vi.getTimerCount()).toBe(1); // Workout elapsed timer remains
+	});
+
+	it("does nothing when the current type is picked", async () => {
+		const { view, plugin } = setup([exercise("A")]);
+		const card = view["exerciseCards"][0]!;
+		const rows = card["setRows"];
+		await changeType(card.getRootEl(), "weight");
+		expect(card["setRows"]).toBe(rows);
+		expect(plugin.saveSettings).not.toHaveBeenCalled();
 	});
 });
 

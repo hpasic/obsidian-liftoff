@@ -1,4 +1,6 @@
 import { App, Modal } from "obsidian";
+import type { ExerciseType } from "../types";
+import { EXERCISE_TYPE_LABELS } from "../utils/exercise-retype";
 
 export class ConfirmModal extends Modal {
 	private message: string;
@@ -101,6 +103,49 @@ export class TextInputModal extends Modal {
 	}
 
 	openAndWait(): Promise<string | null> {
+		return new Promise((resolve) => {
+			this.resolve = resolve;
+			this.open();
+		});
+	}
+}
+
+/** Pick weight / timer / duration. Resolves null on cancel or on the current type. */
+export class ExerciseTypeModal extends Modal {
+	private resolve: (value: ExerciseType | null) => void = () => {};
+
+	constructor(app: App, private exerciseName: string, private current: ExerciseType) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.createEl("p", { text: `Change type of "${this.exerciseName}"`, cls: "ln-modal-message" });
+
+		const toggle = contentEl.createDiv({ cls: "ln-el-type-toggle" });
+		for (const type of ["weight", "timer", "duration"] as const) {
+			const btn = toggle.createEl("button", {
+				cls: `ln-el-type-btn ln-type-choice-btn${type === this.current ? " ln-el-type-btn-active" : ""}`,
+				text: EXERCISE_TYPE_LABELS[type],
+				attr: { "data-type": type },
+			});
+			btn.addEventListener("click", () => {
+				this.resolve(type === this.current ? null : type);
+				this.close();
+			});
+		}
+
+		const btnContainer = contentEl.createDiv({ cls: "ln-modal-buttons" });
+		const cancelBtn = btnContainer.createEl("button", { text: "Cancel" });
+		cancelBtn.addEventListener("click", () => this.close());
+	}
+
+	onClose(): void {
+		this.resolve(null);
+		this.contentEl.empty();
+	}
+
+	openAndWait(): Promise<ExerciseType | null> {
 		return new Promise((resolve) => {
 			this.resolve = resolve;
 			this.open();

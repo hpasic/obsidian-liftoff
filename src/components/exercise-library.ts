@@ -1,6 +1,10 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type { ExerciseLibraryEntry, ExerciseType } from "../types";
+import { typeChangeNotice } from "../utils/exercise-retype";
 import { ConfirmModal } from "./modals";
+
+/** Pushes a saved type change to the templates; resolves to how many changed. */
+export type OnExerciseTypeChanged = (name: string, type: ExerciseType) => Promise<number>;
 
 export class ExerciseLibraryModal extends Modal {
 	private library: ExerciseLibraryEntry[];
@@ -11,7 +15,8 @@ export class ExerciseLibraryModal extends Modal {
 	constructor(
 		app: App,
 		library: ExerciseLibraryEntry[],
-		onSave: (library: ExerciseLibraryEntry[]) => void
+		onSave: (library: ExerciseLibraryEntry[]) => void,
+		private onTypeChanged?: OnExerciseTypeChanged
 	) {
 		super(app);
 		this.library = library.map((e) => ({ ...e }));
@@ -173,15 +178,27 @@ export class ExerciseLibraryModal extends Modal {
 		saveBtn.addEventListener("click", () => {
 			const newName = nameInput.value.trim();
 			if (!newName) return;
+			// Templates still carry the name they were saved with
+			const oldName = entry.name;
+			const typeChanged = (entry.exerciseType ?? "weight") !== currentType;
 			entry.name = newName;
 			entry.exerciseType = currentType === "weight" ? undefined : currentType;
 			entry.notes = notesInput.value.trim() || undefined;
 			this.editingIndex = null;
 			this.save();
 			this.renderList();
+			if (typeChanged) this.propagateType(oldName, newName, currentType);
 		});
 
 		window.activeWindow.setTimeout(() => nameInput.focus(), 50);
+	}
+
+	private propagateType(oldName: string, newName: string, type: ExerciseType): void {
+		if (!this.onTypeChanged) return;
+		void this.onTypeChanged(oldName, type).then(
+			(count) => new Notice(typeChangeNotice(newName, type, count)),
+			(e) => new Notice(`Error updating templates: ${String(e)}`)
+		);
 	}
 
 	private save(): void {

@@ -33,7 +33,9 @@ export class TemplateStore {
 						name: String(ex.name),
 						targetSets: Number(ex.targetSets) || 3,
 						exerciseType:
-							rawType === "timer" || rawType === "duration" ? rawType : undefined,
+							rawType === "weight" || rawType === "timer" || rawType === "duration"
+								? rawType
+								: undefined,
 					});
 				}
 			}
@@ -62,7 +64,8 @@ export class TemplateStore {
 		for (const ex of template.exercises) {
 			lines.push(`  - name: ${ex.name}`);
 			lines.push(`    targetSets: ${ex.targetSets}`);
-			if (ex.exerciseType === "timer" || ex.exerciseType === "duration") {
+			// Explicit "weight" is kept: it overrides a non-weight library type
+			if (ex.exerciseType) {
 				lines.push(`    exerciseType: ${ex.exerciseType}`);
 			}
 		}
