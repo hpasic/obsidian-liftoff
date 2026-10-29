@@ -34,6 +34,70 @@ describe("ExerciseCard weight units", () => {
 		expect(Array.from(root.querySelectorAll(".ln-set-weight-unit"), (el) => el.textContent)).toEqual(["kg", "lbs"]);
 		card.destroy();
 	});
+
+	it("toggles a row's unit from the badge without changing the typed weight", () => {
+		const data = exercise("Bench");
+		const onExerciseChanged = vi.fn();
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS, { onExerciseChanged });
+		const root = card.getRootEl();
+		input(root, ".ln-weight-input", "102.5");
+		const weightInput = element<HTMLInputElement>(root, ".ln-weight-input");
+		weightInput.focus();
+		const badge = element<HTMLButtonElement>(root, ".ln-set-weight-unit");
+		const mousedown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+		badge.dispatchEvent(mousedown);
+		expect(mousedown.defaultPrevented).toBe(true);
+		badge.click();
+		expect(document.activeElement).toBe(weightInput);
+		expect(badge.textContent).toBe("lbs");
+		expect(weightInput.value).toBe("102.5");
+		expect(weightInput.getAttribute("aria-label")).toBe("Weight (lbs)");
+		expect(data.sets[0]).toMatchObject({ weight: 102.5, unit: "lbs" });
+		expect(onExerciseChanged).toHaveBeenCalled();
+
+		click(root, ".ln-add-set-btn");
+		expect(data.sets.map((set) => [set.weight, set.unit])).toEqual([[102.5, "lbs"], [102.5, "lbs"]]);
+		const badges = Array.from(root.querySelectorAll<HTMLButtonElement>(".ln-set-weight-unit"));
+		expect(badges.map((el) => el.textContent)).toEqual(["lbs", "lbs"]);
+
+		badges[1]!.click();
+		expect(data.sets.map((set) => set.unit)).toEqual(["lbs", "kg"]);
+		click(root, ".ln-set-check");
+		expect(data.sets[0]).toMatchObject({ weight: 102.5, unit: "lbs", completed: true });
+		card.destroy();
+	});
+
+	it("adds the previous unit to a placeholder only when it differs from the row", () => {
+		const data = exercise("Pull-up");
+		data.sets.push(workoutSet());
+		const lastData = {
+			date: "2026-09-20",
+			sets: [
+				{ weight: 0, reps: 10, unit: "kg" as const, completed: true },
+				{ weight: 20, reps: 8, unit: "lbs" as const, completed: true },
+			],
+		};
+		const card = new ExerciseCard(document.body, data, lastData, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const root = card.getRootEl();
+		expect(element(root, ".ln-exercise-previous").textContent).toBe("Previous: 20 lbs x 8");
+		const weights = Array.from(root.querySelectorAll<HTMLInputElement>(".ln-weight-input"), (el) => el.placeholder);
+		const reps = Array.from(root.querySelectorAll<HTMLInputElement>(".ln-reps-input"), (el) => el.placeholder);
+		expect(weights).toEqual(["0", "20 lbs"]);
+		expect(reps).toEqual(["10", "8"]);
+		const badge = root.querySelectorAll<HTMLButtonElement>(".ln-set-weight-unit")[1]!;
+		badge.click();
+		expect(root.querySelectorAll<HTMLInputElement>(".ln-weight-input")[1]!.placeholder).toBe("20");
+		card.destroy();
+	});
+
+	it("shows a bodyweight previous set as reps only", () => {
+		const lastData = { date: "2026-09-20", sets: [{ weight: 0, reps: 10, unit: "kg" as const, completed: true }] };
+		const card = new ExerciseCard(document.body, exercise("Pull-up"), lastData, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		expect(element(card.getRootEl(), ".ln-exercise-previous").textContent).toBe("Previous: 10 reps");
+		card.destroy();
+	});
 });
 
 function expectDurationSets(card: ExerciseCard, rows: DurationSetRow[], sets: WorkoutSet[]) {
