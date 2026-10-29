@@ -261,6 +261,35 @@ describe("WorkoutView change type", () => {
 		expect(vi.getTimerCount()).toBe(1); // Workout elapsed timer remains
 	});
 
+	it("forgets the old run: timer -> weight -> timer finishes as not started", async () => {
+		const { view, root, plugin } = setup([exercise("Tabata", "timer")]);
+		const card = view["exerciseCards"][0]!;
+		click(card.getRootEl(), ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(15_000); // Past the count-in: a real run
+		await changeType(card.getRootEl(), "weight");
+		click(document, ".modal .mod-cta");
+		await Promise.resolve();
+		await changeType(card.getRootEl(), "timer");
+		const persisted = plugin.persistActiveWorkout.mock.calls.at(-1)!;
+		expect(persisted[2]).toEqual([]); // No started-timer index survives
+		input(root, ".ln-exercise-note-input", "swapped");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: "swapped" }]);
+		expect(workoutToFullMarkdown(saved)).toContain("_Not started._");
+	});
+
+	it("drops left/right when a unilateral exercise becomes another type", async () => {
+		const lunge: Exercise = { name: "Lunge", exerciseType: "weight", unilateral: true,
+			sets: [{ weight: 0, reps: 0, repsRight: 0, unit: "kg", completed: false }] };
+		const { view } = setup([lunge]);
+		await changeType(view["exerciseCards"][0]!.getRootEl(), "duration");
+		expect(lunge.unilateral).toBeUndefined();
+		await changeType(view["exerciseCards"][0]!.getRootEl(), "weight");
+		expect(lunge.unilateral).toBeUndefined();
+		expect(view.containerEl.querySelector(".ln-reps-right")).toBeNull();
+	});
+
 	it("does nothing when the current type is picked", async () => {
 		const { view, plugin } = setup([exercise("A")]);
 		const card = view["exerciseCards"][0]!;

@@ -68,6 +68,8 @@ export function retypeExercise(exercise: Exercise, type: ExerciseType, weightUni
 	delete exercise.restSeconds;
 	delete exercise.transitionSeconds;
 	delete exercise.intervals;
+	// Left/right is a weight-row option; never carry it to another type
+	if (type !== "weight") delete exercise.unilateral;
 }
 
 /** Library save confirmation after a type change. */

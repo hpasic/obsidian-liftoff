@@ -615,6 +615,8 @@ export class WorkoutView extends ItemView {
 		if (!this.exerciseCards.includes(card)) return;
 
 		retypeExercise(exercise, type, this.plugin.settings.weightUnit);
+		// A run of the old timer must not mark the new one "stopped early"
+		this.startedTimers.delete(exercise);
 		card.rebuild();
 		setLibraryExerciseType(this.plugin.settings.exerciseLibrary, exercise.name, type);
 		void this.plugin.saveSettings();
