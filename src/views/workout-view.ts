@@ -4,11 +4,12 @@ import type { ActiveWorkout, Workout, Exercise, ExerciseType } from "../types";
 import type { WorkoutTemplate } from "../types";
 import { ExerciseCard, type ExerciseCardCallbacks } from "../components/exercise-card";
 import { ExercisePickerModal, type ExerciseSource } from "../components/exercise-picker";
-import { ConfirmModal } from "../components/modals";
+import { ConfirmModal, ExerciseTypeModal } from "../components/modals";
 import { TimerModal } from "./timer-view";
 import { findLastSetsForExercise } from "../utils/history";
 import { remapIndexAfterRemoval, remapIndexAfterSwap } from "../utils/reorder";
 import { computeBests } from "../utils/sets";
+import { EXERCISE_TYPE_LABELS, retypeExercise, setLibraryExerciseType } from "../utils/exercise-retype";
 import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
 import { formatLocalDate } from "../utils/date";
 import { WakeLockClaim } from "../utils/wake-lock";
@@ -299,6 +300,9 @@ export class WorkoutView extends ItemView {
 			onRemove: () => {
 				void this.removeExercise(indexOf());
 			},
+			onChangeType: () => {
+				void this.changeExerciseType(card);
+			},
 			canMoveUp: () => indexOf() > 0,
 			canMoveDown: () => {
 				const i = indexOf();
@@ -544,6 +548,42 @@ export class WorkoutView extends ItemView {
 			}
 		}
 
+		void this.persistState();
+	}
+
+	/**
+	 * Swap one card's body to another type in place. Like reorder/remove, no
+	 * other card is rebuilt, so their running timers and holds keep going.
+	 */
+	private async changeExerciseType(card: ExerciseCard): Promise<void> {
+		const exercise = card.getExercise();
+		const current = exercise.exerciseType ?? "weight";
+		const type = await new ExerciseTypeModal(this.app, exercise.name, current).openAndWait();
+		if (!type) return;
+
+		const completed = exercise.sets.filter((s) => s.completed).length;
+		const label = EXERCISE_TYPE_LABELS[type].toLowerCase();
+		let loss: string | null = null;
+		if (completed > 0) {
+			loss = `Its ${completed} completed set${completed === 1 ? "" : "s"} will be discarded.`;
+		} else if (card.hasUnfinishedTimer()) {
+			loss = "Its running timer will be stopped.";
+		}
+		if (loss) {
+			const confirmed = await new ConfirmModal(
+				this.app,
+				`Change "${exercise.name}" to ${label}? ${loss}`
+			).openAndWait();
+			if (!confirmed) return;
+		}
+
+		// The card may have been removed while a modal was open
+		if (!this.exerciseCards.includes(card)) return;
+
+		retypeExercise(exercise, type, this.plugin.settings.weightUnit);
+		card.rebuild();
+		setLibraryExerciseType(this.plugin.settings.exerciseLibrary, exercise.name, type);
+		void this.plugin.saveSettings();
 		void this.persistState();
 	}
 

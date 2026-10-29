@@ -16,6 +16,8 @@ export interface ExerciseCardCallbacks {
 	canMoveUp?: () => boolean;
 	canMoveDown?: () => boolean;
 	onRemove?: () => void;
+	/** "Change type…" — the owner picks the type, confirms, retypes, then calls rebuild(). */
+	onChangeType?: () => void;
 }
 
 interface SetRowLike {
@@ -127,8 +129,8 @@ export class ExerciseCard {
 	}
 
 	private renderMenuButton(parentEl: HTMLElement): void {
-		const { onMoveUp, onMoveDown, onRemove } = this.callbacks;
-		if (!onMoveUp && !onMoveDown && !onRemove) return;
+		const { onMoveUp, onMoveDown, onRemove, onChangeType } = this.callbacks;
+		if (!onMoveUp && !onMoveDown && !onRemove && !onChangeType) return;
 
 		const menuBtn = parentEl.createEl("button", {
 			cls: "ln-exercise-menu-btn",
@@ -148,6 +150,11 @@ export class ExerciseCard {
 			if (onMoveDown && (this.callbacks.canMoveDown?.() ?? true)) {
 				menu.addItem((item) =>
 					item.setTitle("Move down").setIcon("arrow-down").onClick(() => onMoveDown())
+				);
+			}
+			if (onChangeType) {
+				menu.addItem((item) =>
+					item.setTitle("Change type\u2026").setIcon("repeat").onClick(() => onChangeType())
 				);
 			}
 			if (onRemove) {
@@ -464,6 +471,17 @@ export class ExerciseCard {
 	private setExpanded(expanded: boolean): void {
 		this.expanded = expanded;
 		this.containerEl.toggleClass("ln-exercise-collapsed", !expanded);
+	}
+
+	/**
+	 * Re-render this card's body after its exercise changed type. Only this
+	 * card's rows and timer are torn down; the root element (and anything
+	 * mounted beside it, like the rest timer) stays.
+	 */
+	rebuild(): void {
+		this.prKindsByIndex.clear();
+		this.recomputeBests();
+		this.render();
 	}
 
 	getRootEl(): HTMLElement {

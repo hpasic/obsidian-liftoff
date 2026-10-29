@@ -77,5 +77,28 @@ describe("TemplateEditorModal", () => {
 		pickCatalog("Burpee");
 		expect([...save(onSave)[1]]).toEqual([]);
 	});
-});
 
+	it("changes a row's type, showing the library's type until then", () => {
+		const onSave = vi.fn();
+		new TemplateEditorModal({} as never, {
+			type: "workout-template", name: "Core",
+			exercises: [{ name: "Plank", targetSets: 3 }, { name: "Row", targetSets: 3, exerciseType: "timer" }],
+		}, [{ name: "plank", exerciseType: "duration" }], [], onSave).open();
+		const selects = () => Array.from(document.querySelectorAll<HTMLSelectElement>(".ln-te-type-select"));
+		expect(selects().map((s) => s.value)).toEqual(["duration", "timer"]);
+
+		const plank = selects()[0]!;
+		plank.value = "weight";
+		plank.dispatchEvent(new Event("change"));
+		const row = selects()[1]!;
+		row.value = "duration";
+		row.dispatchEvent(new Event("change"));
+		expect(document.querySelectorAll(".ln-te-sets-label")[1]!.textContent).toBe("3 holds");
+
+		click(document, ".ln-te-save-btn");
+		expect(onSave.mock.calls[0]![0].exercises).toEqual([
+			{ name: "Plank", targetSets: 3, exerciseType: "weight" },
+			{ name: "Row", targetSets: 3, exerciseType: "duration" },
+		]);
+	});
+});

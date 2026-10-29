@@ -1473,3 +1473,8 @@
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 }
+
+.ln-te-type-select {
+	min-height: 36px;
+	font-size: 13px;
+}

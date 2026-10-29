@@ -1,5 +1,6 @@
 import { App, Modal } from "obsidian";
-import type { WorkoutTemplate, ExerciseLibraryEntry, TemplateExercise } from "../types";
+import type { WorkoutTemplate, ExerciseLibraryEntry, ExerciseType, TemplateExercise } from "../types";
+import { EXERCISE_TYPE_LABELS } from "../utils/exercise-retype";
 import { ExercisePickerModal } from "./exercise-picker";
 
 export class TemplateEditorModal extends Modal {
@@ -108,6 +109,7 @@ export class TemplateEditorModal extends Modal {
 			row.createSpan({ cls: "ln-te-exercise-name", text: nameText });
 
 			const controls = row.createDiv({ cls: "ln-te-exercise-controls" });
+			this.renderTypeSelect(controls, ex);
 
 			const minusBtn = controls.createEl("button", {
 				cls: "ln-te-sets-btn",
@@ -144,6 +146,24 @@ export class TemplateEditorModal extends Modal {
 				this.renderExercises();
 			});
 		}
+	}
+
+	/** Per-row type. Shows the effective type: the row's own, else the library's. */
+	private renderTypeSelect(parentEl: HTMLElement, ex: TemplateExercise): void {
+		const libraryType = this.library.find((e) => e.name.toLowerCase() === ex.name.toLowerCase())?.exerciseType;
+		const select = parentEl.createEl("select", {
+			cls: "ln-te-type-select dropdown",
+			attr: { "aria-label": "Exercise type" },
+		});
+		for (const type of ["weight", "timer", "duration"] as const) {
+			select.createEl("option", { text: EXERCISE_TYPE_LABELS[type], attr: { value: type } });
+		}
+		select.value = ex.exerciseType ?? libraryType ?? "weight";
+		select.addEventListener("change", () => {
+			// Explicit, "weight" included, so it wins over the library's type
+			ex.exerciseType = select.value as ExerciseType;
+			this.renderExercises();
+		});
 	}
 
 	onClose(): void {
