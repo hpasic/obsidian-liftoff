@@ -183,3 +183,14 @@ describe("renderSummaryMarkdown", () => {
 		expect(md).not.toContain("Duration");
 	});
 });
+
+describe("buildWorkoutSummary unilateral", () => {
+	it("sums weight × (left + right) and PRs on the weaker side", () => {
+		const history = workout([{ name: "Walking Lunge", unilateral: true, sets: [set({ weight: 20, reps: 8, repsRight: 8 })] }]);
+		const today = workout([{ name: "Walking Lunge", unilateral: true, sets: [set({ weight: 20, reps: 10, repsRight: 8 })] }]);
+		const summary = buildWorkoutSummary(today, [history], "kg");
+		expect(summary.totalVolume).toBe(360);
+		// 8 reps on the weak side ties last time's e1RM; only the two-sided volume beats it
+		expect(summary.prs).toEqual([{ exercise: "Walking Lunge", kinds: ["volume"] }]);
+	});
+});

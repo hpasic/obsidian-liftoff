@@ -26,10 +26,25 @@ export function isWorkingSet(set: WorkoutSet): boolean {
 	return t === "working" || t === "failure";
 }
 
+/** Reps the volume counts: both sides for a unilateral set. */
+export function totalReps(set: WorkoutSet): number {
+	return set.reps + (set.repsRight ?? 0);
+}
+
+/** Reps rep-based PRs and e1RM count: the weaker side for a unilateral set. */
+export function prReps(set: WorkoutSet): number {
+	return set.repsRight === undefined ? set.reps : Math.min(set.reps, set.repsRight);
+}
+
+/** Reps as the note and hints show them: `10` or, per side, `10 / 8`. */
+export function formatReps(set: WorkoutSet): string {
+	return set.repsRight === undefined ? String(set.reps) : `${set.reps} / ${set.repsRight}`;
+}
+
 export function setVolume(set: WorkoutSet): number {
 	const t = effectiveSetType(set);
 	if (t === "warmup" || t === "drop") return 0;
-	return set.weight * set.reps;
+	return set.weight * totalReps(set);
 }
 
 export function toKg(weight: number, unit: "kg" | "lbs"): number {
@@ -67,18 +82,7 @@ export function computeBests(workouts: Workout[], exerciseName: string): PRBests
 		for (const exercise of workout.exercises) {
 			if (exercise.name.toLowerCase() !== nameLower) continue;
 			for (const set of exercise.sets) {
-				if (!isWorkingSet(set)) continue;
-				if (set.weight < 0 || set.reps <= 0) continue;
-				if (set.weight === 0) {
-					if (set.reps > bests.maxBodyweightReps) bests.maxBodyweightReps = set.reps;
-					continue;
-				}
-				const weight = toKg(set.weight, set.unit);
-				if (weight > bests.maxWeight) bests.maxWeight = weight;
-				const oneRM = estimatedOneRepMax(weight, set.reps);
-				if (oneRM > bests.maxOneRM) bests.maxOneRM = oneRM;
-				const vol = weight * set.reps;
-				if (vol > bests.maxVolume) bests.maxVolume = vol;
+				applyToBests(set, bests);
 			}
 		}
 	}
@@ -91,29 +95,31 @@ export function computeBests(workouts: Workout[], exerciseName: string): PRBests
  */
 export function detectPRs(set: WorkoutSet, bests: PRBests): PRKind[] {
 	if (!isWorkingSet(set)) return [];
-	if (set.weight < 0 || set.reps <= 0) return [];
-	if (set.weight === 0) return set.reps > bests.maxBodyweightReps ? ["reps"] : [];
+	const reps = prReps(set);
+	if (set.weight < 0 || reps <= 0) return [];
+	if (set.weight === 0) return reps > bests.maxBodyweightReps ? ["reps"] : [];
 	const kinds: PRKind[] = [];
 	const weight = toKg(set.weight, set.unit);
 	if (weight > bests.maxWeight) kinds.push("weight");
-	if (estimatedOneRepMax(weight, set.reps) > bests.maxOneRM) kinds.push("oneRM");
-	if (weight * set.reps > bests.maxVolume) kinds.push("volume");
+	if (estimatedOneRepMax(weight, reps) > bests.maxOneRM) kinds.push("oneRM");
+	if (weight * totalReps(set) > bests.maxVolume) kinds.push("volume");
 	return kinds;
 }
 
 /** Mutate `bests` to absorb a newly-completed set. */
 export function applyToBests(set: WorkoutSet, bests: PRBests): void {
 	if (!isWorkingSet(set)) return;
-	if (set.weight < 0 || set.reps <= 0) return;
+	const reps = prReps(set);
+	if (set.weight < 0 || reps <= 0) return;
 	if (set.weight === 0) {
-		if (set.reps > bests.maxBodyweightReps) bests.maxBodyweightReps = set.reps;
+		if (reps > bests.maxBodyweightReps) bests.maxBodyweightReps = reps;
 		return;
 	}
 	const weight = toKg(set.weight, set.unit);
 	if (weight > bests.maxWeight) bests.maxWeight = weight;
-	const oneRM = estimatedOneRepMax(weight, set.reps);
+	const oneRM = estimatedOneRepMax(weight, reps);
 	if (oneRM > bests.maxOneRM) bests.maxOneRM = oneRM;
-	const vol = weight * set.reps;
+	const vol = weight * totalReps(set);
 	if (vol > bests.maxVolume) bests.maxVolume = vol;
 }
 

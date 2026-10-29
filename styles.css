@@ -588,6 +588,19 @@
 	}
 }
 
+/* Unilateral: left and right reps share the reps column */
+.ln-set-reps-lr {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 4px;
+	min-width: 0;
+}
+
+.ln-exercise-card .ln-set-reps-lr .ln-reps-input {
+	padding-left: 2px;
+	padding-right: 2px;
+}
+
 .ln-set-input::-webkit-outer-spin-button,
 .ln-set-input::-webkit-inner-spin-button {
 	-webkit-appearance: none;
@@ -1051,6 +1064,16 @@
 	cursor: pointer;
 }
 
+.ln-el-type-row.ln-el-hidden {
+	display: none;
+}
+
+.ln-el-unilateral-badge {
+	font-size: 10px;
+	color: var(--text-faint);
+	margin-left: 6px;
+}
+
 .ln-el-type-btn.ln-el-type-btn-active {
 	border-color: var(--interactive-accent);
 	color: var(--interactive-accent);
@@ -1427,6 +1450,36 @@
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
 	text-align: center;
+}
+
+.ln-te-exercise-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 4px;
+}
+
+.ln-te-exercise-main .ln-te-exercise-name {
+	max-width: 100%;
+}
+
+.ln-te-sides-btn {
+	min-height: 32px;
+	padding: 4px 10px;
+	border-radius: 8px;
+	border: 1.5px solid transparent;
+	cursor: pointer;
+	font-size: 12px;
+	background: var(--background-modifier-hover);
+	color: var(--text-faint);
+}
+
+.ln-te-sides-btn.ln-te-sides-btn-active {
+	border-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+	font-weight: 600;
 }
 
 .ln-te-sets-label {

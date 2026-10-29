@@ -237,3 +237,33 @@ describe("mixed-unit PRs", () => {
 		expect(mixed).toEqual(bests);
 	});
 });
+
+describe("unilateral sets", () => {
+	const lunge = (overrides: Partial<WorkoutSet> = {}) => baseSet({ weight: 20, reps: 10, repsRight: 8, ...overrides });
+
+	it("counts both sides in volume", () => {
+		expect(setVolume(lunge())).toBe(360);
+		expect(setVolume(baseSet())).toBe(800);
+	});
+
+	it("uses the weaker side for e1RM and rep PRs, both sides for volume PRs", () => {
+		const bests = { ...EMPTY_BESTS, maxWeight: 20, maxOneRM: estimatedOneRepMax(20, 8), maxVolume: 359 };
+		expect(detectPRs(lunge(), bests)).toEqual(["volume"]);
+		expect(detectPRs(lunge({ reps: 9, repsRight: 9 }), bests)).toEqual(["oneRM", "volume"]);
+		expect(detectPRs(lunge({ reps: 12, repsRight: 8 }), { ...bests, maxVolume: 400 })).toEqual([]);
+		expect(detectPRs(lunge({ weight: 0, reps: 12, repsRight: 8 }), { ...EMPTY_BESTS, maxBodyweightReps: 8 })).toEqual([]);
+		expect(detectPRs(lunge({ weight: 0, reps: 12, repsRight: 9 }), { ...EMPTY_BESTS, maxBodyweightReps: 8 })).toEqual(["reps"]);
+		expect(detectPRs(lunge({ repsRight: 0 }), EMPTY_BESTS)).toEqual([]);
+	});
+
+	it("absorbs the weaker side into bests", () => {
+		const bests = { ...EMPTY_BESTS };
+		applyToBests(lunge(), bests);
+		expect(bests).toEqual({ maxWeight: 20, maxOneRM: estimatedOneRepMax(20, 8), maxVolume: 360, maxBodyweightReps: 0 });
+		const history: Workout = {
+			type: "workout", template: null, date: "2026-10-01", start: "10:00", end: null, duration: null,
+			exercises: [{ name: "Walking Lunge", unilateral: true, sets: [lunge(), lunge({ weight: 0, reps: 15, repsRight: 12 })] }],
+		};
+		expect(computeBests([history], "walking lunge")).toEqual({ ...bests, maxBodyweightReps: 12 });
+	});
+});

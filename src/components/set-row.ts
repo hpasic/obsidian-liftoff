@@ -18,10 +18,16 @@ export interface SetRowCallbacks {
 	onSetRemoved: () => void;
 }
 
+export interface SetRowOptions {
+	/** Show left and right rep inputs; the set carries `repsRight`. */
+	unilateral?: boolean;
+}
+
 export class SetRow {
 	private containerEl: HTMLElement;
 	private weightInput: HTMLInputElement;
 	private repsInput: HTMLInputElement;
+	private repsRightInput: HTMLInputElement | null = null;
 	private checkBtn: HTMLButtonElement;
 	private set: WorkoutSet;
 	private weightUnit: "kg" | "lbs";
@@ -31,9 +37,11 @@ export class SetRow {
 		private setNumber: number,
 		set: WorkoutSet,
 		private previous: WorkoutSet | null,
-		private callbacks: SetRowCallbacks
+		private callbacks: SetRowCallbacks,
+		private options: SetRowOptions = {}
 	) {
 		this.set = { ...set };
+		if (options.unilateral) this.set.repsRight ??= 0;
 		this.weightUnit = set.unit;
 		this.containerEl = parentEl.createDiv({ cls: "ln-set-row" });
 		this.weightInput = null!;
@@ -102,20 +110,24 @@ export class SetRow {
 			this.callbacks.onSetChanged(this.set);
 		});
 
-		// Reps input
-		this.repsInput = this.containerEl.createEl("input", {
-			cls: "ln-set-input ln-reps-input",
-			attr: {
-				type: "number",
-				inputmode: "numeric",
-				placeholder: this.previous ? String(this.previous.reps) : "",
-			},
-		});
-		if (this.set.reps > 0) {
-			this.repsInput.value = String(this.set.reps);
+		// Reps input — left and right side by side for a unilateral exercise
+		if (this.options.unilateral) {
+			const repsEl = this.containerEl.createDiv({ cls: "ln-set-reps-lr" });
+			this.repsInput = this.createRepsInput(repsEl, "ln-reps-left", "Left reps",
+				this.previous ? String(this.previous.reps) : "L", this.set.reps);
+			this.repsRightInput = this.createRepsInput(repsEl, "ln-reps-right", "Right reps",
+				this.previous?.repsRight !== undefined ? String(this.previous.repsRight) : "R",
+				this.set.repsRight ?? 0);
+			this.repsRightInput.addEventListener("input", () => {
+				this.set.repsRight = this.readReps(this.repsRightInput);
+				this.callbacks.onSetChanged(this.set);
+			});
+		} else {
+			this.repsInput = this.createRepsInput(this.containerEl, "", null,
+				this.previous ? String(this.previous.reps) : "", this.set.reps);
 		}
 		this.repsInput.addEventListener("input", () => {
-			this.set.reps = parseInt(this.repsInput.value, 10) || 0;
+			this.set.reps = this.readReps(this.repsInput);
 			this.callbacks.onSetChanged(this.set);
 		});
 
@@ -127,7 +139,8 @@ export class SetRow {
 		this.checkBtn.addEventListener("click", () => {
 			this.set.completed = !this.set.completed;
 			this.set.weight = parseWeight(this.weightInput.value);
-			this.set.reps = parseInt(this.repsInput.value, 10) || 0;
+			this.set.reps = this.readReps(this.repsInput);
+			if (this.repsRightInput) this.set.repsRight = this.readReps(this.repsRightInput);
 			this.render();
 			this.callbacks.onSetCompleted(this.set);
 		});
@@ -141,6 +154,30 @@ export class SetRow {
 		removeBtn.addEventListener("click", () => {
 			this.callbacks.onSetRemoved();
 		});
+	}
+
+	private createRepsInput(
+		parentEl: HTMLElement,
+		sideCls: string,
+		label: string | null,
+		placeholder: string,
+		value: number
+	): HTMLInputElement {
+		const el = parentEl.createEl("input", {
+			cls: `ln-set-input ln-reps-input ${sideCls}`.trimEnd(),
+			attr: {
+				type: "number",
+				inputmode: "numeric",
+				placeholder,
+				...(label ? { "aria-label": label } : {}),
+			},
+		});
+		if (value > 0) el.value = String(value);
+		return el;
+	}
+
+	private readReps(el: HTMLInputElement | null): number {
+		return el ? parseInt(el.value, 10) || 0 : 0;
 	}
 
 	private unitLabel(): string {

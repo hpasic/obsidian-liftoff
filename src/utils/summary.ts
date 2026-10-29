@@ -1,5 +1,5 @@
 import type { Workout } from "../types";
-import { applyToBests, computeBests, detectPRs, isWorkingSet, toKg, PR_LABEL, type PRKind } from "./sets";
+import { applyToBests, computeBests, detectPRs, isWorkingSet, toKg, totalReps, PR_LABEL, type PRKind } from "./sets";
 
 export interface ExercisePRSummary {
 	exercise: string;
@@ -33,7 +33,7 @@ export function buildWorkoutSummary(workout: Workout, history: Workout[], unit: 
 			if (!isWorkingSet(set)) continue;
 			totalWorkingSets += 1;
 			const weight = set.unit === unit ? set.weight : toKg(set.weight, set.unit) / toKg(1, unit);
-			totalVolume += weight * set.reps;
+			totalVolume += weight * totalReps(set);
 			for (const kind of detectPRs(set, bests)) {
 				seenKinds.add(kind);
 			}

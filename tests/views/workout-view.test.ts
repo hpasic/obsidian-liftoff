@@ -566,3 +566,58 @@ describe("WorkoutView history auto-fill", () => {
 			.toBe("Last note (2026-09-22): skipped, grip sore");
 	});
 });
+
+describe("WorkoutView unilateral exercises", () => {
+	it("logs L and R from a library pick, saves both, and pre-fills them next time", async () => {
+		const history: Workout[] = [];
+		const { view, root, plugin } = setup([], history);
+		plugin.settings.exerciseLibrary = [{ name: "Walking Lunge", unilateral: true }];
+		click(root, ".ln-add-exercise-btn");
+		input(document, ".ln-exercise-search", "walking lunge");
+		click(document, ".ln-exercise-result");
+		input(root, ".ln-weight-input", "20");
+		input(root, ".ln-reps-left", "10");
+		input(root, ".ln-reps-right", "8");
+		click(root, ".ln-set-check");
+		await finish(root);
+		const [saved, summary] = plugin.workoutStore.saveWorkout.mock.calls[0]! as [Workout, string];
+		expect(saved.exercises).toEqual([{
+			name: "Walking Lunge", exerciseType: "weight", unilateral: true,
+			sets: [{ weight: 20, reps: 10, repsRight: 8, unit: "kg", completed: true }],
+		}]);
+		expect(workoutToFullMarkdown(saved)).toContain("| 1   | 20 kg  | 10 / 8 |");
+		expect(summary).toContain("- **Total volume**: 360 kg");
+
+		history.unshift({ ...saved, date: "2026-09-20" });
+		view.startFromTemplate({
+			type: "workout-template", name: "Legs", exercises: [{ name: "Walking Lunge", targetSets: 2 }],
+		});
+		const card = view["exerciseCards"][0]!;
+		expect(card.getExercise()).toMatchObject({ unilateral: true });
+		expect(card.getExercise().sets.map((s) => [s.reps, s.repsRight])).toEqual([[10, 8], [0, 0]]);
+		const cardRoot = card.getRootEl();
+		expect(element<HTMLInputElement>(cardRoot, ".ln-reps-left").value).toBe("10");
+		expect(element<HTMLInputElement>(cardRoot, ".ln-reps-right").value).toBe("8");
+		expect(element(cardRoot, ".ln-exercise-previous").textContent).toBe("Previous: 20 kg x 10 / 8");
+	});
+
+	it("takes the flag from the template and writes no repsRight for bilateral exercises", async () => {
+		const { view, root, plugin } = setup();
+		view.startFromTemplate({
+			type: "workout-template", name: "Legs",
+			exercises: [{ name: "Pistol Squat", targetSets: 1, unilateral: true }, { name: "Squat", targetSets: 1 }],
+		});
+		const [pistol, squat] = view["exerciseCards"].map((c) => c.getExercise());
+		expect(pistol!.sets[0]).toHaveProperty("repsRight", 0);
+		expect(squat).not.toHaveProperty("unilateral");
+		const rows = root.querySelectorAll(".ln-sets-container .ln-set-row");
+		expect(rows[0]!.querySelectorAll(".ln-reps-input")).toHaveLength(2);
+		expect(rows[1]!.querySelectorAll(".ln-reps-input")).toHaveLength(1);
+		input(rows[1]!, ".ln-reps-input", "5");
+		click(rows[1]!, ".ln-set-check");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Squat", exerciseType: "weight", sets: [{ weight: 0, reps: 5, unit: "kg", completed: true }] }]);
+		expect(workoutToFullMarkdown(saved)).not.toContain("repsRight");
+	});
+});

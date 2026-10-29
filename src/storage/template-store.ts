@@ -34,6 +34,7 @@ export class TemplateStore {
 						targetSets: Number(ex.targetSets) || 3,
 						exerciseType:
 							rawType === "timer" || rawType === "duration" ? rawType : undefined,
+						...(ex.unilateral === true ? { unilateral: true } : {}),
 					});
 				}
 			}
@@ -64,6 +65,8 @@ export class TemplateStore {
 			lines.push(`    targetSets: ${ex.targetSets}`);
 			if (ex.exerciseType === "timer" || ex.exerciseType === "duration") {
 				lines.push(`    exerciseType: ${ex.exerciseType}`);
+			} else if (ex.unilateral) {
+				lines.push(`    unilateral: true`);
 			}
 		}
 		lines.push("---");

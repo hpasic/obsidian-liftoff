@@ -5,11 +5,12 @@ import { workoutToFrontmatter } from "../../src/utils/frontmatter";
 import { DEFAULT_SETTINGS, type Workout } from "../../src/types";
 import { findLastSetsForExercise } from "../../src/utils/history";
 
-/** Just enough YAML for what workoutToFrontmatter writes: scalars, quoted strings, flow maps. */
+/** Just enough YAML for what workoutToFrontmatter writes: scalars, booleans, quoted strings, flow maps. */
 function scalar(raw: string): unknown {
 	const value = raw.trim();
 	if (value.startsWith('"')) return JSON.parse(value) as string;
 	if (value === "[]") return [];
+	if (value === "true" || value === "false") return value === "true";
 	return value !== "" && !isNaN(Number(value)) ? Number(value) : value;
 }
 
@@ -63,6 +64,24 @@ const base: Workout = {
 };
 
 describe("WorkoutStore.parseWorkoutFile round-trip", () => {
+	it("keeps left and right reps on a unilateral exercise and feeds both to the next session", () => {
+		const lunge = {
+			name: "Walking Lunge", unilateral: true, note: undefined,
+			sets: [{ weight: 20, reps: 10, repsRight: 8, unit: "kg" as const, completed: true }],
+		};
+		const parsed = roundTrip({ ...base, exercises: [lunge] });
+		expect(parsed?.exercises).toEqual([lunge]);
+		expect(findLastSetsForExercise([parsed!], "walking lunge")?.sets).toEqual(lunge.sets);
+	});
+
+	it("loads a note without repsRight unchanged", () => {
+		const bench = { name: "Bench", note: undefined, sets: [{ weight: 80, reps: 5, unit: "kg" as const, completed: true }] };
+		const parsed = roundTrip({ ...base, exercises: [bench] });
+		expect(parsed?.exercises).toEqual([bench]);
+		expect(parsed?.exercises[0]).not.toHaveProperty("unilateral");
+		expect(parsed?.exercises[0]!.sets[0]).not.toHaveProperty("repsRight");
+	});
+
 	it("keeps a stopped-early timer's config and marker through markdown and parsing", () => {
 		const timer = {
 			name: "Tabata", exerciseType: "timer" as const, sets: [],
