@@ -22,6 +22,8 @@ export class WorkoutView extends ItemView {
 	private plugin: LiftOffPlugin;
 	private workout: Workout;
 	private exerciseCards: ExerciseCard[] = [];
+	/** Object identity keeps runtime state with its exercise across moves/removals. */
+	private startedTimers = new Set<Exercise>();
 	private startTime: Date;
 	private timerIntervalId: number | null = null;
 	private hasElapsedTimerCleanup = false;
@@ -80,6 +82,7 @@ export class WorkoutView extends ItemView {
 		this.stopRestTimer();
 		this.workout = this.createEmptyWorkout();
 		this.workout.template = template.name;
+		this.startedTimers.clear();
 		this.workout.exercises = template.exercises.map((te) => {
 			const exerciseType = te.exerciseType ?? this.lookupExerciseType(te.name);
 			if (exerciseType === "timer") {
@@ -127,6 +130,7 @@ export class WorkoutView extends ItemView {
 		this.initialized = true;
 		this.stopRestTimer();
 		this.workout = this.createEmptyWorkout();
+		this.startedTimers.clear();
 		this.startTime = new Date();
 		this.loadRecentWorkouts();
 		this.renderWorkout();
@@ -136,6 +140,11 @@ export class WorkoutView extends ItemView {
 	resume(active: ActiveWorkout): void {
 		this.initialized = true;
 		this.workout = active.workout;
+		this.startedTimers = new Set(
+			(active.startedTimerIndices ?? [])
+				.map((i) => this.workout.exercises[i])
+				.filter((e): e is Exercise => e?.exerciseType === "timer")
+		);
 		this.startTime = new Date(active.startTimeMs);
 		this.loadRecentWorkouts();
 		this.renderWorkout();
@@ -201,7 +210,9 @@ export class WorkoutView extends ItemView {
 
 	private async persistState(): Promise<void> {
 		if (!this.initialized) return;
-		await this.plugin.persistActiveWorkout(this.collectWorkout(), this.startTime.getTime());
+		const workout = this.collectWorkout();
+		const startedTimerIndices = workout.exercises.flatMap((e, i) => this.startedTimers.has(e) ? [i] : []);
+		await this.plugin.persistActiveWorkout(workout, this.startTime.getTime(), startedTimerIndices);
 	}
 
 	private renderWorkout(): void {
@@ -288,6 +299,10 @@ export class WorkoutView extends ItemView {
 		let card: ExerciseCard;
 		const indexOf = () => this.exerciseCards.indexOf(card);
 		const callbacks: ExerciseCardCallbacks = {
+			onTimerStartedChanged: (started) => {
+				if (started) this.startedTimers.add(exercise);
+				else this.startedTimers.delete(exercise);
+			},
 			onExerciseChanged: () => {
 				void this.persistState();
 			},
@@ -533,6 +548,7 @@ export class WorkoutView extends ItemView {
 		card.destroy();
 		this.exerciseCards.splice(at, 1);
 		this.workout.exercises.splice(at, 1);
+		this.startedTimers.delete(exercise);
 
 		if (this.activeRestExerciseIndex !== null) {
 			const nextRestIndex = remapIndexAfterRemoval(this.activeRestExerciseIndex, at);
@@ -560,7 +576,7 @@ export class WorkoutView extends ItemView {
 			.map((e, i): Exercise => {
 				const sets = e.sets.filter((s) => s.completed);
 				if (e.exerciseType === "timer" && sets.length === 0) {
-					if (this.exerciseCards[i]?.hasUnfinishedTimer()) {
+					if (this.startedTimers.has(e) || this.exerciseCards[i]?.hasUnfinishedTimer()) {
 						return { ...e, sets, note: [e.note?.trim(), "Timer stopped early."].filter(Boolean).join("\n") };
 					}
 					// Never run: drop the config so the note can't pass for a completed timer

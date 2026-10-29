@@ -50,6 +50,8 @@ export interface WorkoutTemplate {
 export interface ActiveWorkout {
 	workout: Workout;
 	startTimeMs: number;
+	/** Exercise indices whose first work interval began; active-workout state only. */
+	startedTimerIndices?: number[];
 }
 
 export interface ExerciseLibraryEntry {

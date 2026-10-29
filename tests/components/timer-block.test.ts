@@ -6,18 +6,38 @@ import { click, element, input, trackIntervals } from "../helpers/dom";
 
 function setup(initialCompleted = false) {
 	const root = document.body.createDiv();
-	const callbacks = { onCompleted: vi.fn(), onChanged: vi.fn(), onReset: vi.fn() };
+	const callbacks = { onStarted: vi.fn(), onCompleted: vi.fn(), onChanged: vi.fn(), onReset: vi.fn() };
 	const timer = new TimerBlock(root, 2, 3, 1, 3, callbacks, initialCompleted);
 	return { root, callbacks, timer };
 }
 
 describe("TimerBlock", () => {
+	it("counts a run as unfinished only once the first work interval begins", () => {
+		const { root, timer, callbacks } = setup();
+		expect(timer.hasUnfinishedRun()).toBe(false);
+		click(root, ".ln-timer-block-start-btn");
+		expect(timer.hasUnfinishedRun()).toBe(false);
+		vi.advanceTimersByTime(9_999);
+		expect(callbacks.onStarted).not.toHaveBeenCalled();
+		click(root, ".ln-timer-block-control-btn");
+		expect(timer.hasUnfinishedRun()).toBe(false);
+		vi.advanceTimersByTime(20_000); // Pausing count-in cannot start work
+		click(root, ".ln-timer-block-control-btn");
+		vi.advanceTimersByTime(1_000); // Resume schedules the next one-second tick
+		expect(timer.hasUnfinishedRun()).toBe(true);
+		expect(callbacks.onStarted).toHaveBeenCalledTimes(1);
+		click(root, ".ln-timer-block-control-btn");
+		expect(timer.hasUnfinishedRun()).toBe(true);
+		timer.destroy();
+	});
+
 	it("runs count-in, work, switch and rest phases without trailing rest or leaked intervals", () => {
 		const tracking = trackIntervals();
 		const { root, callbacks, timer } = setup();
 		const phase = () => element(root, ".ln-timer-block-phase-label").textContent;
 		click(root, ".ln-timer-block-start-btn");
 		expect(phase()).toBe("GET READY");
+		expect(callbacks.onStarted).not.toHaveBeenCalled();
 		vi.advanceTimersByTime(10000);
 		expect(phase()).toBe("WORK");
 		expect(element(root, ".ln-timer-block-interval-label").textContent).toBe("Interval 1/3");
@@ -34,6 +54,7 @@ describe("TimerBlock", () => {
 		vi.advanceTimersByTime(2000);
 		expect(timer.getState().completed).toBe(true);
 		expect(callbacks.onCompleted).toHaveBeenCalledTimes(1);
+		expect(callbacks.onStarted).toHaveBeenCalledTimes(1);
 		expect(element(root, ".ln-timer-block-done-label").textContent).toContain("3 intervals completed");
 		expect(vi.getTimerCount()).toBe(0);
 		expect(tracking.ids()).toHaveLength(6);
@@ -66,6 +87,7 @@ describe("TimerBlock", () => {
 	it("restores completed state and resets to editable inputs without starting an interval", () => {
 		const { root, timer, callbacks } = setup(true);
 		expect(timer.getState().completed).toBe(true);
+		expect(callbacks.onStarted).not.toHaveBeenCalled();
 		expect(callbacks.onCompleted).not.toHaveBeenCalled();
 		click(root, ".ln-timer-block-reset-btn");
 		expect(callbacks.onReset).toHaveBeenCalledTimes(1);
