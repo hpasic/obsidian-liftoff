@@ -1,5 +1,5 @@
 import type { Workout } from "../types";
-import { effectiveSetType } from "./sets";
+import { effectiveSetType, formatReps } from "./sets";
 
 const SET_TYPE_BODY_LABEL: Record<string, string> = {
 	working: "",
@@ -65,13 +65,13 @@ export function workoutToFrontmatter(workout: Workout): string {
 				lines.push(`      - { ${parts.join(", ")} }`);
 			}
 		} else {
+			if (exercise.unilateral) lines.push(`    unilateral: true`);
 			lines.push(exercise.sets.length > 0 ? "    sets:" : "    sets: []");
 			for (const set of exercise.sets) {
-				const parts = [
-					`weight: ${set.weight}`,
-					`reps: ${set.reps}`,
-					`unit: ${set.unit}`,
-				];
+				const parts = [`weight: ${set.weight}`, `reps: ${set.reps}`];
+				// Only unilateral exercises carry a right side; others keep their original shape
+				if (exercise.unilateral) parts.push(`repsRight: ${set.repsRight ?? 0}`);
+				parts.push(`unit: ${set.unit}`);
 				if (set.setType && set.setType !== "working") {
 					parts.push(`setType: ${set.setType}`);
 				}
@@ -146,8 +146,9 @@ export function workoutToMarkdownBody(workout: Workout): string {
 				const weightStr = `${set.weight} ${set.unit}`;
 				const typeSuffix = SET_TYPE_BODY_LABEL[effectiveSetType(set)] ?? "";
 				const setLabel = `${i + 1}${typeSuffix}`;
+				const repsStr = formatReps({ ...set, repsRight: exercise.unilateral ? set.repsRight ?? 0 : undefined });
 				lines.push(
-					`| ${setLabel.padEnd(3)} | ${weightStr.padEnd(6)} | ${String(set.reps).padEnd(4)} |`
+					`| ${setLabel.padEnd(3)} | ${weightStr.padEnd(6)} | ${repsStr.padEnd(4)} |`
 				);
 			});
 		}

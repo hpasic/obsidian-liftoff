@@ -30,4 +30,18 @@ describe("addTemplateExercisesToLibrary", () => {
 			{ name: "Burpee", exerciseType: "duration", source: "catalog" },
 		]);
 	});
+
+	it("copies the unilateral flag to new entries and onto existing ones", () => {
+		const library: ExerciseLibraryEntry[] = [{ name: "Bulgarian split squat" }];
+		addTemplateExercisesToLibrary(library, [
+			{ name: "Bulgarian split squat", targetSets: 3, unilateral: true },
+			{ name: "Walking Lunge", targetSets: 3, unilateral: true },
+			{ name: "Squat", targetSets: 3 },
+		], new Set());
+		expect(JSON.parse(JSON.stringify(library))).toEqual([
+			{ name: "Bulgarian split squat", unilateral: true },
+			{ name: "Walking Lunge", unilateral: true },
+			{ name: "Squat" },
+		]);
+	});
 });

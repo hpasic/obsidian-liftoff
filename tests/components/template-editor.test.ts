@@ -78,6 +78,40 @@ describe("TemplateEditorModal", () => {
 		expect([...save(onSave)[1]]).toEqual([]);
 	});
 
+	it("copies a library pick's unilateral flag and toggles it per row", () => {
+		const onSave = vi.fn();
+		new TemplateEditorModal({} as never, { type: "workout-template", name: "Legs", exercises: [] },
+			[{ name: "Walking Lunge", unilateral: true }, { name: "Squat" }, { name: "Plank", exerciseType: "duration" }],
+			[], onSave).open();
+		for (const name of ["walking lunge", "squat"]) {
+			click(document, ".ln-te-add-btn");
+			input(document, ".ln-exercise-search", name);
+			click(document, ".ln-exercise-result");
+		}
+		createTimer("Tabata");
+		click(document, ".ln-te-add-btn");
+		input(document, ".ln-exercise-search", "plank");
+		click(document, ".ln-exercise-result");
+		// Library-typed duration row gets no chip; switching it to weight shows one
+		expect(document.querySelectorAll(".ln-te-sides-btn")).toHaveLength(2);
+		const plankType = Array.from(document.querySelectorAll<HTMLSelectElement>(".ln-te-type-select"))[3]!;
+		plankType.value = "weight";
+		plankType.dispatchEvent(new Event("change"));
+		expect(document.querySelectorAll(".ln-te-sides-btn")).toHaveLength(3);
+		const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".ln-te-sides-btn")).slice(0, 2);
+		expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
+		buttons[0]!.click();
+		buttons[1]!.click();
+		expect(buttons.map((b) => b.classList.contains("ln-te-sides-btn-active"))).toEqual([false, true]);
+		const [template] = save(onSave);
+		expect(JSON.parse(JSON.stringify(template.exercises))).toEqual([
+			{ name: "Walking Lunge", targetSets: 3 },
+			{ name: "Squat", targetSets: 3, unilateral: true },
+			{ name: "Tabata", targetSets: 3, exerciseType: "timer" },
+			{ name: "Plank", targetSets: 3, exerciseType: "weight" },
+		]);
+	});
+
 	it("changes a row's type, showing the library's type until then", () => {
 		const onSave = vi.fn();
 		new TemplateEditorModal({} as never, {

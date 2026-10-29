@@ -36,6 +36,7 @@ export class TemplateStore {
 							rawType === "weight" || rawType === "timer" || rawType === "duration"
 								? rawType
 								: undefined,
+						...(ex.unilateral === true ? { unilateral: true } : {}),
 					});
 				}
 			}
@@ -67,6 +68,9 @@ export class TemplateStore {
 			// Explicit "weight" is kept: it overrides a non-weight library type
 			if (ex.exerciseType) {
 				lines.push(`    exerciseType: ${ex.exerciseType}`);
+			}
+			if (ex.unilateral && (ex.exerciseType ?? "weight") === "weight") {
+				lines.push(`    unilateral: true`);
 			}
 		}
 		lines.push("---");

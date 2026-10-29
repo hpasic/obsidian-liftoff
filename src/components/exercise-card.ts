@@ -1,7 +1,7 @@
 import { Menu } from "obsidian";
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
-import { applyToBests, detectPRs, type PRBests, type PRKind } from "../utils/sets";
+import { applyToBests, detectPRs, formatReps, type PRBests, type PRKind } from "../utils/sets";
 import { DurationSetRow } from "./duration-set-row";
 import { SetRow } from "./set-row";
 import { TimerBlock } from "./timer-block";
@@ -338,16 +338,17 @@ export class ExerciseCard {
 		const colHeaders = this.containerEl.createDiv({ cls: "ln-set-row ln-set-header" });
 		colHeaders.createSpan({ cls: "ln-set-number", text: "SET" });
 		colHeaders.createSpan({ cls: "ln-set-input", text: "WEIGHT" });
-		colHeaders.createSpan({ cls: "ln-set-input", text: "REPS" });
+		colHeaders.createSpan({ cls: "ln-set-input", text: this.exercise.unilateral ? "L / R" : "REPS" });
 
 		// Previous hint
 		if (this.lastData && this.lastData.sets.length > 0) {
 			const lastSet = this.lastData.sets[this.lastData.sets.length - 1]!;
+			const reps = formatReps(lastSet);
 			this.containerEl.createDiv({
 				cls: "ln-exercise-previous",
 				text: lastSet.weight > 0
-					? `Previous: ${lastSet.weight} ${lastSet.unit} x ${lastSet.reps}`
-					: `Previous: ${lastSet.reps} reps`,
+					? `Previous: ${lastSet.weight} ${lastSet.unit} x ${reps}`
+					: `Previous: ${reps} reps`,
 			});
 		}
 
@@ -368,6 +369,7 @@ export class ExerciseCard {
 				unit: lastSet && lastSet.weight > 0 ? lastSet.unit : this.settings.weightUnit,
 				completed: false,
 			};
+			if (this.exercise.unilateral) newSet.repsRight = 0;
 			this.exercise.sets.push(newSet);
 			this.render();
 			this.notifyChanged();
@@ -418,7 +420,8 @@ export class ExerciseCard {
 						this.render();
 						this.notifyChanged();
 					},
-				}
+				},
+				{ unilateral: this.exercise.unilateral }
 			);
 			this.setRows.push(row);
 

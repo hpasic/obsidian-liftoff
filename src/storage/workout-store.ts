@@ -144,6 +144,7 @@ export class WorkoutStore {
 						note,
 					});
 				} else {
+					const unilateral = ex.unilateral === true;
 					const sets: WorkoutSet[] = [];
 					if (Array.isArray(ex.sets)) {
 						for (const s of ex.sets as Array<Record<string, unknown>>) {
@@ -153,16 +154,15 @@ export class WorkoutStore {
 								unit: s.unit === "lbs" ? "lbs" : "kg",
 								completed: true,
 							};
+							if (unilateral) set.repsRight = Number(s.repsRight) || 0;
 							const setType = parseSetType(s.setType);
 							if (setType) set.setType = setType;
 							sets.push(set);
 						}
 					}
-					exercises.push({
-						name: String(ex.name),
-						sets,
-						note,
-					});
+					const parsed: Exercise = { name: String(ex.name), sets, note };
+					if (unilateral) parsed.unilateral = true;
+					exercises.push(parsed);
 				}
 			}
 		}

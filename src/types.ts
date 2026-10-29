@@ -4,7 +4,10 @@ export type SetType = "warmup" | "working" | "drop" | "failure";
 
 export interface WorkoutSet {
 	weight: number;
+	/** Left side for unilateral exercises. */
 	reps: number;
+	/** Right-side reps. Present only on sets of unilateral exercises. */
+	repsRight?: number;
 	unit: "kg" | "lbs";
 	completed: boolean;
 	setType?: SetType;
@@ -15,6 +18,8 @@ export interface WorkoutSet {
 export interface Exercise {
 	name: string;
 	exerciseType?: ExerciseType;
+	/** Logged per side: each set has left (`reps`) and right (`repsRight`) reps. */
+	unilateral?: boolean;
 	sets: WorkoutSet[];
 	/** Free-text note for this exercise in this workout. */
 	note?: string;
@@ -39,6 +44,7 @@ export interface TemplateExercise {
 	name: string;
 	targetSets: number;
 	exerciseType?: ExerciseType;
+	unilateral?: boolean;
 }
 
 export interface WorkoutTemplate {
@@ -57,6 +63,7 @@ export interface ActiveWorkout {
 export interface ExerciseLibraryEntry {
 	name: string;
 	exerciseType?: ExerciseType;
+	unilateral?: boolean;
 	notes?: string;
 	/** Set when the entry was copied in from the bundled catalog. Absent = user-created. */
 	source?: "catalog";

@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type LiftOffPlugin from "../main";
-import type { ActiveWorkout, Workout, Exercise, ExerciseType } from "../types";
+import type { ActiveWorkout, Workout, Exercise, ExerciseType, WorkoutSet } from "../types";
 import type { WorkoutTemplate } from "../types";
 import { ExerciseCard, type ExerciseCardCallbacks } from "../components/exercise-card";
 import { ExercisePickerModal, type ExerciseSource } from "../components/exercise-picker";
@@ -77,6 +77,12 @@ export class WorkoutView extends ItemView {
 		return entry?.exerciseType ?? "weight";
 	}
 
+	private lookupUnilateral(name: string): boolean {
+		return this.plugin.settings.exerciseLibrary.some(
+			(e) => e.unilateral === true && e.name.toLowerCase() === name.toLowerCase()
+		);
+	}
+
 	startFromTemplate(template: WorkoutTemplate): void {
 		this.initialized = true;
 		// A reused view instance may still be running the previous workout's rest timer
@@ -109,12 +115,15 @@ export class WorkoutView extends ItemView {
 					})),
 				};
 			}
+			const unilateral = te.unilateral ?? this.lookupUnilateral(te.name);
 			return {
 				name: te.name,
 				exerciseType: exerciseType,
-				sets: Array.from({ length: te.targetSets }, () => ({
+				...(unilateral ? { unilateral } : {}),
+				sets: Array.from({ length: te.targetSets }, (): WorkoutSet => ({
 					weight: 0,
 					reps: 0,
+					...(unilateral ? { repsRight: 0 } : {}),
 					unit: this.plugin.settings.weightUnit,
 					completed: false,
 				})),
@@ -177,6 +186,7 @@ export class WorkoutView extends ItemView {
 					if (prev) {
 						exercise.sets[i]!.weight = prev.weight;
 						exercise.sets[i]!.reps = prev.reps;
+						if (exercise.unilateral) exercise.sets[i]!.repsRight = prev.repsRight ?? 0;
 						exercise.sets[i]!.unit = prev.weight > 0 ? prev.unit : this.plugin.settings.weightUnit;
 						if (prev.setType) exercise.sets[i]!.setType = prev.setType;
 					}
@@ -440,6 +450,7 @@ export class WorkoutView extends ItemView {
 		}
 
 		const lastData = findLastSetsForExercise(this.recentWorkouts, name);
+		const unilateral = exerciseType === "weight" && this.lookupUnilateral(name);
 
 		let newExercise: Exercise;
 		if (exerciseType === "timer") {
@@ -473,21 +484,28 @@ export class WorkoutView extends ItemView {
 			newExercise = {
 				name,
 				exerciseType,
+				...(unilateral ? { unilateral } : {}),
 				sets: [
 					{
 						weight: 0,
 						reps: 0,
+						...(unilateral ? { repsRight: 0 } : {}),
 						unit: this.plugin.settings.weightUnit,
 						completed: false,
 					},
 				],
 			};
 			if (lastData && lastData.sets.length > 0) {
-				newExercise.sets = lastData.sets.map((s) => ({
-					...s,
-					unit: s.weight > 0 ? s.unit : this.plugin.settings.weightUnit,
-					completed: false,
-				}));
+				newExercise.sets = lastData.sets.map((s) => {
+					// Right side only on unilateral exercises, whatever the history logged
+					const { repsRight, ...rest } = s;
+					return {
+						...rest,
+						...(unilateral ? { repsRight: repsRight ?? 0 } : {}),
+						unit: s.weight > 0 ? s.unit : this.plugin.settings.weightUnit,
+						completed: false,
+					};
+				});
 			}
 		}
 

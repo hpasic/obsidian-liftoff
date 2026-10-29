@@ -57,6 +57,8 @@ export class TemplateEditorModal extends Modal {
 						targetSets: 3,
 						exerciseType: exerciseType === "weight" ? undefined : exerciseType,
 					};
+					const entry = this.library.find((e) => e.name.toLowerCase() === name.toLowerCase());
+					if (exerciseType === "weight" && entry?.unilateral) row.unilateral = true;
 					if (source === "catalog") this.catalogRows.add(row);
 					this.template.exercises.push(row);
 					this.renderExercises();
@@ -106,7 +108,24 @@ export class TemplateEditorModal extends Modal {
 			if (isTimer) nameText = `\u23F1 ${ex.name}`;
 			else if (isDuration) nameText = `\u23F2 ${ex.name}`;
 			else nameText = ex.name;
-			row.createSpan({ cls: "ln-te-exercise-name", text: nameText });
+			// Name with the per-side toggle under it, so the controls keep their width on a phone
+			const main = row.createDiv({ cls: "ln-te-exercise-main" });
+			main.createSpan({ cls: "ln-te-exercise-name", text: nameText });
+
+			// Weight rows only, by the type the row's dropdown shows
+			if (this.effectiveType(ex) === "weight") {
+				const sidesBtn = main.createEl("button", {
+					cls: `ln-te-sides-btn ${ex.unilateral ? "ln-te-sides-btn-active" : ""}`.trimEnd(),
+					text: "Per side",
+					attr: { "aria-label": "Log left and right reps", "aria-pressed": String(!!ex.unilateral) },
+				});
+				sidesBtn.addEventListener("click", () => {
+					if (ex.unilateral) delete ex.unilateral;
+					else ex.unilateral = true;
+					sidesBtn.toggleClass("ln-te-sides-btn-active", !!ex.unilateral);
+					sidesBtn.setAttr("aria-pressed", String(!!ex.unilateral));
+				});
+			}
 
 			const controls = row.createDiv({ cls: "ln-te-exercise-controls" });
 			this.renderTypeSelect(controls, ex);
@@ -148,9 +167,15 @@ export class TemplateEditorModal extends Modal {
 		}
 	}
 
+	/** The row's own type, else the library's. */
+	private effectiveType(ex: TemplateExercise): ExerciseType {
+		return ex.exerciseType
+			?? this.library.find((e) => e.name.toLowerCase() === ex.name.toLowerCase())?.exerciseType
+			?? "weight";
+	}
+
 	/** Per-row type. Shows the effective type: the row's own, else the library's. */
 	private renderTypeSelect(parentEl: HTMLElement, ex: TemplateExercise): void {
-		const libraryType = this.library.find((e) => e.name.toLowerCase() === ex.name.toLowerCase())?.exerciseType;
 		const select = parentEl.createEl("select", {
 			cls: "ln-te-type-select dropdown",
 			attr: { "aria-label": "Exercise type" },
@@ -158,7 +183,7 @@ export class TemplateEditorModal extends Modal {
 		for (const type of ["weight", "timer", "duration"] as const) {
 			select.createEl("option", { text: EXERCISE_TYPE_LABELS[type], attr: { value: type } });
 		}
-		select.value = ex.exerciseType ?? libraryType ?? "weight";
+		select.value = this.effectiveType(ex);
 		select.addEventListener("change", () => {
 			// Explicit, "weight" included, so it wins over the library's type
 			ex.exerciseType = select.value as ExerciseType;
