@@ -144,7 +144,32 @@ describe("WorkoutStore.parseWorkoutFile round-trip", () => {
 });
 
 describe("WorkoutStore.getRecentWorkouts", () => {
-	it.each([undefined, "invalid"])("orders both notes by mtime when only one start is valid (other: %s)", (otherStart) => {
+	it("orders same-day notes totally: valid starts first by start, the rest by mtime", () => {
+		// A < C < B < A under the old pairwise rule; the result depended on folder order
+		const notes = [
+			{ name: "A", start: "18:00", mtime: "19:00" },
+			{ name: "B", start: undefined, mtime: "20:00" },
+			{ name: "C", start: "08:00", mtime: "21:00" },
+			{ name: "D", start: "invalid", mtime: "22:00" },
+		];
+		const files = notes.map((n) => Object.assign(new TFile(), {
+			path: `Workouts/${n.name}.md`, basename: n.name,
+			stat: { mtime: new Date(`2026-09-24T${n.mtime}`).getTime() },
+		}));
+		const frontmatter = notes.map((n) => ({ type: "workout", date: base.date, start: n.start, exercises: [] }));
+		const orders = [files, [...files].reverse(), [files[1]!, files[3]!, files[0]!, files[2]!]];
+		for (const children of orders) {
+			const folder = Object.assign(new TFolder(), { children });
+			const app = {
+				vault: { getAbstractFileByPath: () => folder },
+				metadataCache: { getFileCache: (file: TFile) => ({ frontmatter: frontmatter[files.indexOf(file)] }) },
+			} as unknown as App;
+			const store = new WorkoutStore(app, () => DEFAULT_SETTINGS);
+			expect(store.getRecentWorkouts().map((w) => w.filename)).toEqual(["A", "C", "D", "B"]);
+		}
+	});
+
+	it.each([undefined, "invalid"])("ranks the note with a valid start newer (other: %s)", (otherStart) => {
 		const files = ["valid", "other"].map((name, i) => Object.assign(new TFile(), {
 			path: `Workouts/${name}.md`, basename: name,
 			stat: { mtime: new Date(`2026-09-24T${i === 0 ? "20:00" : "19:00"}`).getTime() },
@@ -152,7 +177,7 @@ describe("WorkoutStore.getRecentWorkouts", () => {
 		const frontmatter = files.map((_, i) => ({
 			type: "workout", date: base.date, start: i === 0 ? "08:00" : otherStart, exercises: [],
 		}));
-		// Both input orders must use mtimes for the pair, never mix start and mtime.
+		// Both input orders agree.
 		for (const children of [files, [...files].reverse()]) {
 			const folder = Object.assign(new TFolder(), { children });
 			const app = {

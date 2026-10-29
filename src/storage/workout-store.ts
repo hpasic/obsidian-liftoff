@@ -84,11 +84,14 @@ export class WorkoutStore {
 		workouts.sort((a, b) => {
 			const dateOrder = b.date.localeCompare(a.date);
 			if (dateOrder !== 0) return dateOrder;
+			// Total order on a date: notes with a valid start rank newer than
+			// notes without; starts order the first group, mtimes the second
 			const aStart = startTimes.get(a.path);
 			const bStart = startTimes.get(b.path);
-			return aStart !== undefined && bStart !== undefined
-				? bStart - aStart
-				: modifiedTimes.get(b.path)! - modifiedTimes.get(a.path)!;
+			if (aStart !== undefined && bStart !== undefined) return bStart - aStart;
+			if (aStart !== undefined) return -1;
+			if (bStart !== undefined) return 1;
+			return modifiedTimes.get(b.path)! - modifiedTimes.get(a.path)!;
 		});
 		return workouts.slice(0, limit);
 	}
