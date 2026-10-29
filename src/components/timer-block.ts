@@ -1,6 +1,7 @@
 import { WakeLockClaim } from "../utils/wake-lock";
 
 export interface TimerBlockCallbacks {
+	onStarted?: () => void;
 	onCompleted: () => void;
 	onChanged: (workSeconds: number, restSeconds: number, transitionSeconds: number, intervals: number) => void;
 	onReset?: () => void;
@@ -259,6 +260,7 @@ export class TimerBlock {
 			// Count-in done → start first work phase
 			this.runPhase = "work";
 			this.countdown = this.workSeconds;
+			this.callbacks.onStarted?.();
 			this.render();
 			this.tick();
 		} else if (this.runPhase === "work") {

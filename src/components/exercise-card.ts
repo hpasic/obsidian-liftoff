@@ -8,6 +8,7 @@ import { TimerBlock } from "./timer-block";
 
 export interface ExerciseCardCallbacks {
 	onExerciseChanged: (exercise: Exercise) => void;
+	onTimerStartedChanged?: (started: boolean) => void;
 	onSetCompleted?: (set: WorkoutSet) => void;
 	onMoveUp?: () => void;
 	onMoveDown?: () => void;
@@ -294,6 +295,10 @@ export class ExerciseCard {
 			transitionSec,
 			intervals,
 			{
+				onStarted: () => {
+					this.callbacks.onTimerStartedChanged?.(true);
+					this.notifyChanged();
+				},
 				onCompleted: () => {
 					const count = this.timerBlock?.getState().intervals ?? intervals;
 					this.exercise.sets = Array.from({ length: count }, () => ({
@@ -313,6 +318,7 @@ export class ExerciseCard {
 				},
 				onReset: () => {
 					this.exercise.sets = [];
+					this.callbacks.onTimerStartedChanged?.(false);
 					this.notifyChanged();
 				},
 			},

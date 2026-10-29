@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceLeaf } from "obsidian";
 import type LiftOffPlugin from "../../src/main";
 import { WorkoutView } from "../../src/views/workout-view";
-import { DEFAULT_SETTINGS, type Exercise, type Workout } from "../../src/types";
+import { DEFAULT_SETTINGS, type ActiveWorkout, type Exercise, type Workout } from "../../src/types";
 import { DurationSetRow } from "../../src/components/duration-set-row";
 import { screenWakeLock } from "../../src/utils/wake-lock";
 import { workoutToFullMarkdown } from "../../src/utils/frontmatter";
@@ -14,7 +14,7 @@ afterEach(async () => {
 	for (const view of views.splice(0)) await view.onClose();
 });
 
-function setup(exercises: Exercise[] = [], history: Workout[] = []) {
+function setup(exercises: Exercise[] = [], history: Workout[] = [], startedTimerIndices?: number[]) {
 	const plugin = {
 		settings: { ...DEFAULT_SETTINGS, holdBufferSeconds: 0, exerciseLibrary: [] },
 		workoutStore: {
@@ -33,7 +33,7 @@ function setup(exercises: Exercise[] = [], history: Workout[] = []) {
 	};
 	const view = new WorkoutView({ app: {} } as unknown as WorkspaceLeaf, plugin as unknown as LiftOffPlugin);
 	document.body.appendChild(view.containerEl);
-	view.resume({ workout, startTimeMs: Date.now() });
+	view.resume({ workout, startTimeMs: Date.now(), startedTimerIndices });
 	views.push(view);
 	return { view, workout, plugin, root: view.containerEl };
 }
@@ -330,12 +330,15 @@ describe("WorkoutView finish", () => {
 		expect(plugin.clearActiveWorkout).not.toHaveBeenCalled();
 	});
 
-	it.each([false, true])("saves a timer finished during count-in with a note as not started (paused: %s)", async (paused) => {
+	it.each([
+		[0, false], [0, true], [9_999, false], [9_999, true],
+	] as const)("saves count-in as not started after %i ms (paused: %s)", async (elapsed, paused) => {
 		const timer = { ...exercise("Tabata", "timer"), transitionSeconds: 5 };
 		const { root, plugin } = setup([timer]);
 		click(root, ".ln-timer-block-start-btn");
-		vi.advanceTimersByTime(9_000); // Still in count-in, just before the first work phase
+		vi.advanceTimersByTime(elapsed);
 		input(root, ".ln-exercise-note-input", "ran out of time");
+		expect(plugin.persistActiveWorkout).toHaveBeenLastCalledWith(expect.anything(), expect.any(Number), []);
 		if (paused) click(root, ".ln-timer-block-control-btn");
 		await finish(root);
 		expect(plugin.workoutStore.saveWorkout).toHaveBeenCalledTimes(1);
@@ -355,7 +358,8 @@ describe("WorkoutView finish", () => {
 		const timer = { ...exercise("Tabata", "timer"), transitionSeconds: 5 };
 		const { root, plugin } = setup([timer]);
 		click(root, ".ln-timer-block-start-btn");
-		vi.advanceTimersByTime(15_000); // Count-in finished; first work interval still running
+		vi.advanceTimersByTime(10_000); // First work interval has just begun
+		expect(plugin.persistActiveWorkout).toHaveBeenLastCalledWith(expect.anything(), expect.any(Number), [0]);
 		if (note) input(root, ".ln-exercise-note-input", note);
 		if (paused) click(root, ".ln-timer-block-control-btn");
 		await finish(root);
@@ -367,6 +371,71 @@ describe("WorkoutView finish", () => {
 		expect(markdown).toContain("Intervals: 3 × 0:40 work / 0:20 rest / 0:05 switch");
 		expect(markdown).not.toContain("_Not started._");
 		expect(timer.note).toBe(note); // Save leaves the live note untouched
+	});
+
+	it.each([false, true])("finishes a restored started timer without restarting its work interval (count-in: %s)", async (countIn) => {
+		const timer = { ...exercise("Tabata", "timer"), note: "feeling tired" };
+		const { root, plugin } = setup([timer, exercise("Tabata", "timer")], [], [0]);
+		expect(root.querySelector(".ln-timer-block-countdown")).toBeNull();
+		if (countIn) click(root, ".ln-timer-block-start-btn");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ ...timer, note: "feeling tired\nTimer stopped early." }]);
+		expect(saved).not.toHaveProperty("startedTimerIndices");
+		expect(saved.exercises[0]).not.toHaveProperty("startedTimerIndices");
+		const markdown = workoutToFullMarkdown(saved);
+		expect(markdown).toContain("Intervals: 3 × 0:40 work / 0:20 rest");
+		expect(markdown).toContain("> Timer stopped early.");
+		expect(markdown).not.toContain("startedTimerIndices");
+	});
+
+	it("persists the first work interval immediately and finishes after a JSON round-trip and resume", async () => {
+		const { view, root, plugin } = setup([exercise("Tabata", "timer")]);
+		click(root, ".ln-timer-block-start-btn");
+		expect(plugin.persistActiveWorkout).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(10_000);
+		const [workout, startTimeMs, startedTimerIndices] = plugin.persistActiveWorkout.mock.lastCall!;
+		const restored = JSON.parse(JSON.stringify({ workout, startTimeMs, startedTimerIndices })) as ActiveWorkout;
+		expect(restored.startedTimerIndices).toEqual([0]);
+		view.resume(restored);
+		expect(root.querySelector(".ln-timer-block-countdown")).toBeNull();
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ ...restored.workout.exercises[0], note: "Timer stopped early." }]);
+	});
+
+	it("keeps started markers attached to duplicate-name exercises through moves and removals", async () => {
+		const { view, root, plugin } = setup([exercise("Same", "timer"), exercise("Same", "timer"), exercise("Other")]);
+		const [neverStarted, started, other] = view["exerciseCards"];
+		click(started!.getRootEl(), ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(10_000);
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([1]);
+		menuAction(started!.getRootEl(), "Move up");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		menuAction(other!.getRootEl(), "Remove exercise");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		menuAction(started!.getRootEl(), "Move down");
+		menuAction(neverStarted!.getRootEl(), "Remove exercise");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		const [workout, startTimeMs, startedTimerIndices] = plugin.persistActiveWorkout.mock.lastCall!;
+		view.resume(JSON.parse(JSON.stringify({ workout, startTimeMs, startedTimerIndices })) as ActiveWorkout);
+		await finish(root);
+		expect((plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout).exercises[0]?.note).toBe("Timer stopped early.");
+	});
+
+	it("clears the started marker when a completed timer is reset", async () => {
+		const timer = { ...exercise("Tabata", "timer"), workSeconds: 1, intervals: 1, note: "try again later" };
+		const { root, plugin } = setup([timer]);
+		click(root, ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(11_000);
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		click(root, ".ln-timer-block-reset-btn");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([]);
+		click(root, ".ln-timer-block-start-btn");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: timer.note }]);
+		expect(workoutToFullMarkdown(saved)).toContain("_Not started._");
 	});
 
 	it("keeps an exercise with a note even when none of its sets was completed", async () => {
