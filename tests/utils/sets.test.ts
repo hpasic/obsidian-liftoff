@@ -9,6 +9,7 @@ import {
 	detectPRs,
 	applyToBests,
 	EMPTY_BESTS,
+	toKg,
 } from "../../src/utils/sets";
 import type { Workout, WorkoutSet } from "../../src/types";
 
@@ -131,7 +132,7 @@ describe("computeBests", () => {
 });
 
 describe("detectPRs", () => {
-	const bests = { maxWeight: 100, maxOneRM: 120, maxVolume: 500 };
+	const bests = { maxWeight: 100, maxOneRM: 120, maxVolume: 500, maxBodyweightReps: 0 };
 
 	it("returns no PRs when set ties the best", () => {
 		expect(detectPRs(baseSet({ weight: 100, reps: 5 }), bests)).toEqual([]);
@@ -164,14 +165,75 @@ describe("detectPRs", () => {
 
 describe("applyToBests", () => {
 	it("mutates bests to absorb a new working set", () => {
-		const bests = { maxWeight: 100, maxOneRM: 120, maxVolume: 500 };
+		const bests = { maxWeight: 100, maxOneRM: 120, maxVolume: 500, maxBodyweightReps: 0 };
 		applyToBests(baseSet({ weight: 110, reps: 5 }), bests);
 		expect(bests.maxWeight).toBe(110);
 	});
 
 	it("does not absorb warmup sets", () => {
-		const bests = { maxWeight: 100, maxOneRM: 120, maxVolume: 500 };
+		const bests = { maxWeight: 100, maxOneRM: 120, maxVolume: 500, maxBodyweightReps: 0 };
 		applyToBests(baseSet({ weight: 200, reps: 5, setType: "warmup" }), bests);
 		expect(bests.maxWeight).toBe(100);
+	});
+});
+
+describe("bodyweight rep PRs", () => {
+	it("tracks only positive bodyweight reps from working and failure sets", () => {
+		const sets = [
+			baseSet({ weight: 0, reps: 8 }),
+			baseSet({ weight: 0, reps: 10, setType: "failure" }),
+			baseSet({ weight: 0, reps: 20, setType: "warmup" }),
+			baseSet({ weight: 0, reps: 30, setType: "drop" }),
+			baseSet({ weight: -10, reps: 40 }),
+			baseSet({ weight: 0, reps: 0 }),
+			baseSet({ weight: 20, reps: 50 }),
+		];
+		const bests = computeBests([workoutWithBench(sets)], "Bench Press");
+		expect(bests.maxBodyweightReps).toBe(10);
+		const absorbed = { ...EMPTY_BESTS };
+		for (const set of sets) applyToBests(set, absorbed);
+		expect(absorbed).toEqual(bests);
+		for (const set of sets.slice(2, 6)) expect(detectPRs(set, EMPTY_BESTS)).toEqual([]);
+	});
+
+	it("detects and absorbs rep PRs so later sets must strictly beat them", () => {
+		const bests = { ...EMPTY_BESTS };
+		const first = baseSet({ weight: 0, reps: 8 });
+		expect(detectPRs(first, bests)).toEqual(["reps"]);
+		applyToBests(first, bests);
+		expect(bests).toEqual({ ...EMPTY_BESTS, maxBodyweightReps: 8 });
+		expect(detectPRs(first, bests)).toEqual([]);
+		expect(detectPRs(baseSet({ weight: 0, reps: 7 }), bests)).toEqual([]);
+		const next = baseSet({ weight: 0, reps: 9, setType: "failure" });
+		expect(detectPRs(next, bests)).toEqual(["reps"]);
+		applyToBests(next, bests);
+		expect(bests.maxBodyweightReps).toBe(9);
+		expect(detectPRs(baseSet({ weight: 20, reps: 10 }), bests)).toEqual(["weight", "oneRM", "volume"]);
+	});
+});
+
+describe("mixed-unit PRs", () => {
+	it("converts pounds to kg and leaves kg unchanged", () => {
+		expect(toKg(100, "lbs")).toBeCloseTo(45.359237, 8);
+		expect(toKg(100, "kg")).toBe(100);
+	});
+
+	it.each([
+		{ previousWeight: 100, previousUnit: "lbs", weight: 50, unit: "kg", kg: 50, lighterWeight: 45 },
+		{ previousWeight: 50, previousUnit: "kg", weight: 120, unit: "lbs", kg: 54.4310844, lighterWeight: 100 },
+	] as const)("compares and absorbs $unit sets against $previousUnit history in kg", (test) => {
+		const previous = baseSet({ weight: test.previousWeight, unit: test.previousUnit, reps: 5 });
+		const current = baseSet({ weight: test.weight, unit: test.unit, reps: 5 });
+		const history = workoutWithBench([previous]);
+		const bests = computeBests([history], "Bench Press");
+		expect(detectPRs(baseSet({ weight: test.lighterWeight, unit: test.unit, reps: 5 }), bests)).toEqual([]);
+		expect(detectPRs(current, bests)).toEqual(["weight", "oneRM", "volume"]);
+		applyToBests(current, bests);
+		expect(bests.maxWeight).toBeCloseTo(test.kg, 8);
+		expect(bests.maxOneRM).toBeCloseTo(test.kg * (1 + 5 / 30), 8);
+		expect(bests.maxVolume).toBeCloseTo(test.kg * 5, 8);
+		expect(detectPRs(current, bests)).toEqual([]);
+		const mixed = computeBests([history, workoutWithBench([current])], "Bench Press");
+		expect(mixed).toEqual(bests);
 	});
 });

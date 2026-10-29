@@ -1,5 +1,5 @@
 import type { Workout } from "../types";
-import { applyToBests, computeBests, detectPRs, isWorkingSet, PR_LABEL, type PRKind } from "./sets";
+import { applyToBests, computeBests, detectPRs, isWorkingSet, toKg, PR_LABEL, type PRKind } from "./sets";
 
 export interface ExercisePRSummary {
 	exercise: string;
@@ -18,10 +18,9 @@ export interface WorkoutSummary {
  * Compute summary stats for a finished workout, evaluating PRs against `history`
  * (which should NOT include the workout itself — history is the "before" state).
  */
-export function buildWorkoutSummary(workout: Workout, history: Workout[]): WorkoutSummary {
+export function buildWorkoutSummary(workout: Workout, history: Workout[], unit: "kg" | "lbs"): WorkoutSummary {
 	let totalWorkingSets = 0;
 	let totalVolume = 0;
-	let unit: "kg" | "lbs" = "kg";
 	const prs: ExercisePRSummary[] = [];
 
 	for (const exercise of workout.exercises) {
@@ -33,8 +32,8 @@ export function buildWorkoutSummary(workout: Workout, history: Workout[]): Worko
 		for (const set of exercise.sets) {
 			if (!isWorkingSet(set)) continue;
 			totalWorkingSets += 1;
-			totalVolume += set.weight * set.reps;
-			unit = set.unit;
+			const weight = set.unit === unit ? set.weight : toKg(set.weight, set.unit) / toKg(1, unit);
+			totalVolume += weight * set.reps;
 			for (const kind of detectPRs(set, bests)) {
 				seenKinds.add(kind);
 			}

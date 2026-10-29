@@ -55,6 +55,7 @@ export class WorkoutStore {
 
 		const workouts: RecentWorkout[] = [];
 		const startTimes = new Map<string, number>();
+		const modifiedTimes = new Map<string, number>();
 
 		for (const file of folder.children) {
 			if (!(file instanceof TFile) || file.extension !== "md") continue;
@@ -65,7 +66,8 @@ export class WorkoutStore {
 
 			const date = (fm.date as string) ?? file.basename.substring(0, 10);
 			const startTime = typeof fm.start === "string" ? Date.parse(`${date}T${fm.start}`) : NaN;
-			startTimes.set(file.path, Number.isFinite(startTime) ? startTime : file.stat.mtime);
+			if (Number.isFinite(startTime)) startTimes.set(file.path, startTime);
+			modifiedTimes.set(file.path, file.stat.mtime);
 
 			workouts.push({
 				filename: file.basename,
@@ -79,7 +81,15 @@ export class WorkoutStore {
 			});
 		}
 
-		workouts.sort((a, b) => b.date.localeCompare(a.date) || startTimes.get(b.path)! - startTimes.get(a.path)!);
+		workouts.sort((a, b) => {
+			const dateOrder = b.date.localeCompare(a.date);
+			if (dateOrder !== 0) return dateOrder;
+			const aStart = startTimes.get(a.path);
+			const bStart = startTimes.get(b.path);
+			return aStart !== undefined && bStart !== undefined
+				? bStart - aStart
+				: modifiedTimes.get(b.path)! - modifiedTimes.get(a.path)!;
+		});
 		return workouts.slice(0, limit);
 	}
 

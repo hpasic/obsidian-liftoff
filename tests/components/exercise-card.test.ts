@@ -275,6 +275,21 @@ describe("ExerciseCard duration set operations", () => {
 });
 
 describe("ExerciseCard", () => {
+	it("shows Rep PR for bodyweight sets and absorbs it before a later tie", () => {
+		const data = exercise("Pull-ups");
+		data.sets = [8, 8, 9].map((reps) => ({ ...workoutSet(), weight: 0, reps }));
+		const card = new ExerciseCard(document.body, data, null, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const rows = card.getRootEl().querySelectorAll(".ln-sets-container > .ln-set-row");
+		click(rows[0]!, ".ln-set-check");
+		expect(rows[0]!.nextElementSibling?.textContent).toContain("Rep PR");
+		click(rows[1]!, ".ln-set-check");
+		expect(card.getRootEl().querySelectorAll(".ln-pr-badge")).toHaveLength(1);
+		click(rows[2]!, ".ln-set-check");
+		expect(rows[2]!.nextElementSibling?.textContent).toContain("Rep PR");
+		card.destroy();
+	});
+
 	it("rolls back a removed PR before detecting the next completed set", () => {
 		const data = exercise("Bench Press");
 		data.sets = [
@@ -285,6 +300,7 @@ describe("ExerciseCard", () => {
 			maxWeight: 80,
 			maxOneRM: 80 * (1 + 5 / 30),
 			maxVolume: 400,
+			maxBodyweightReps: 0,
 		}, { onExerciseChanged: vi.fn() });
 
 		const first = element(card.getRootEl(), ".ln-sets-container > .ln-set-row");

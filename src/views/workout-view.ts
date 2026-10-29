@@ -584,7 +584,7 @@ export class WorkoutView extends ItemView {
 		};
 
 		try {
-			const summary = buildWorkoutSummary(finished, this.recentWorkouts);
+			const summary = buildWorkoutSummary(finished, this.recentWorkouts, this.plugin.settings.weightUnit);
 			const summaryMd = renderSummaryMarkdown(summary);
 			await this.plugin.workoutStore.saveWorkout(finished, summaryMd);
 			await this.plugin.clearActiveWorkout();

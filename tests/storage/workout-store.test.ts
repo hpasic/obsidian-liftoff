@@ -39,7 +39,10 @@ function parseFrontmatter(yaml: string): Record<string, unknown> {
 }
 
 function storeFor(workout: Workout) {
-	const file = Object.assign(new TFile(), { path: "Workouts/w.md", basename: "w" });
+	const file = Object.assign(new TFile(), {
+		path: "Workouts/w.md", basename: "w",
+		stat: { mtime: new Date(`${workout.date}T${workout.start}`).getTime() },
+	});
 	const folder = Object.assign(new TFolder(), { path: "Workouts", children: [file] });
 	const frontmatter = parseFrontmatter(workoutToFrontmatter(workout));
 	const app = {
@@ -122,6 +125,27 @@ describe("WorkoutStore.parseWorkoutFile round-trip", () => {
 });
 
 describe("WorkoutStore.getRecentWorkouts", () => {
+	it.each([undefined, "invalid"])("orders both notes by mtime when only one start is valid (other: %s)", (otherStart) => {
+		const files = ["valid", "other"].map((name, i) => Object.assign(new TFile(), {
+			path: `Workouts/${name}.md`, basename: name,
+			stat: { mtime: new Date(`2026-09-24T${i === 0 ? "20:00" : "19:00"}`).getTime() },
+		}));
+		const frontmatter = files.map((_, i) => ({
+			type: "workout", date: base.date, start: i === 0 ? "08:00" : otherStart, exercises: [],
+		}));
+		// Both input orders must use mtimes for the pair, never mix start and mtime.
+		for (const children of [files, [...files].reverse()]) {
+			const folder = Object.assign(new TFolder(), { children });
+			const app = {
+				vault: { getAbstractFileByPath: () => folder },
+				metadataCache: { getFileCache: (file: TFile) => ({ frontmatter: frontmatter[files.indexOf(file)] }) },
+			} as unknown as App;
+			const store = new WorkoutStore(app, () => DEFAULT_SETTINGS);
+			expect(store.getRecentWorkouts().map((w) => w.path)).toEqual(files.map((f) => f.path));
+			expect(store.getRecentWorkouts(1)[0]!.path).toBe(files[0]!.path);
+		}
+	});
+
 	it.each([
 		["08:00", "18:00"],
 		[undefined, undefined],

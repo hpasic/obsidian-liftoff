@@ -310,6 +310,17 @@ async function finish(root: HTMLElement) {
 }
 
 describe("WorkoutView finish", () => {
+	it("saves summary volume in the settings unit when rows use another unit", async () => {
+		const bench = exercise("Bench");
+		bench.sets = [{ weight: 50, reps: 5, unit: "kg", completed: false }];
+		const { root, plugin } = setup([bench]);
+		plugin.settings.weightUnit = "lbs";
+		click(root, ".ln-set-check");
+		await finish(root);
+		const summary = plugin.workoutStore.saveWorkout.mock.calls[0]![1] as string;
+		expect(summary).toContain("- **Total volume**: 551.2 lbs");
+	});
+
 	it.each([false, true])("does not save a timer finished during count-in without a note (paused: %s)", async (paused) => {
 		const { root, plugin } = setup([exercise("Tabata", "timer")]);
 		click(root, ".ln-timer-block-start-btn");
