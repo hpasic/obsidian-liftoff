@@ -54,6 +54,7 @@ describe("TemplateStore unilateral flag", () => {
 			exercises: [
 				{ name: "Walking Lunge", targetSets: 3, unilateral: true },
 				{ name: "Squat", targetSets: 4 },
+				{ name: "Lunge", targetSets: 3, unilateral: false },
 				{ name: "Plank", targetSets: 2, exerciseType: "duration", unilateral: true },
 				{ name: "Pistol Squat", targetSets: 2, exerciseType: "weight", unilateral: true },
 			],
@@ -63,6 +64,7 @@ describe("TemplateStore unilateral flag", () => {
 			"---", "type: workout-template", "name: Legs", "exercises:",
 			"  - name: Walking Lunge", "    targetSets: 3", "    unilateral: true",
 			"  - name: Squat", "    targetSets: 4",
+			"  - name: Lunge", "    targetSets: 3", "    unilateral: false",
 			"  - name: Plank", "    targetSets: 2", "    exerciseType: duration",
 			"  - name: Pistol Squat", "    targetSets: 2", "    exerciseType: weight", "    unilateral: true",
 			"---", "",
@@ -71,6 +73,7 @@ describe("TemplateStore unilateral flag", () => {
 		expect(loaded!.exercises).toEqual([
 			{ name: "Walking Lunge", targetSets: 3, exerciseType: undefined, unilateral: true },
 			{ name: "Squat", targetSets: 4, exerciseType: undefined },
+			{ name: "Lunge", targetSets: 3, exerciseType: undefined, unilateral: false },
 			{ name: "Plank", targetSets: 2, exerciseType: "duration" },
 			{ name: "Pistol Squat", targetSets: 2, exerciseType: "weight", unilateral: true },
 		]);

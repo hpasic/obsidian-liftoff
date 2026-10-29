@@ -105,11 +105,31 @@ describe("TemplateEditorModal", () => {
 		expect(buttons.map((b) => b.classList.contains("ln-te-sides-btn-active"))).toEqual([false, true]);
 		const [template] = save(onSave);
 		expect(JSON.parse(JSON.stringify(template.exercises))).toEqual([
-			{ name: "Walking Lunge", targetSets: 3 },
+			{ name: "Walking Lunge", targetSets: 3, unilateral: false },
 			{ name: "Squat", targetSets: 3, unilateral: true },
 			{ name: "Tabata", targetSets: 3, exerciseType: "timer" },
 			{ name: "Plank", targetSets: 3, exerciseType: "weight" },
 		]);
+	});
+
+	it("shows the library's Per side until toggled, then stores it explicitly without touching the library", () => {
+		const onSave = vi.fn();
+		const library = [{ name: "Lunge", unilateral: true }, { name: "Squat" }];
+		new TemplateEditorModal({} as never, {
+			type: "workout-template", name: "Legs",
+			exercises: [{ name: "Lunge", targetSets: 3 }, { name: "Squat", targetSets: 3 }],
+		}, library, [], onSave).open();
+		const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".ln-te-sides-btn"));
+		expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
+		buttons[0]!.click();
+		buttons[1]!.click();
+		expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
+		const [template] = save(onSave);
+		expect(template.exercises).toEqual([
+			{ name: "Lunge", targetSets: 3, unilateral: false },
+			{ name: "Squat", targetSets: 3, unilateral: true },
+		]);
+		expect(library).toEqual([{ name: "Lunge", unilateral: true }, { name: "Squat" }]);
 	});
 
 	it("changes a row's type, showing the library's type until then", () => {

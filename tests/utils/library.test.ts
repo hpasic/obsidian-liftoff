@@ -31,7 +31,7 @@ describe("addTemplateExercisesToLibrary", () => {
 		]);
 	});
 
-	it("copies the unilateral flag to new entries and onto existing ones", () => {
+	it("never copies a template's unilateral flag into the library", () => {
 		const library: ExerciseLibraryEntry[] = [{ name: "Bulgarian split squat" }];
 		addTemplateExercisesToLibrary(library, [
 			{ name: "Bulgarian split squat", targetSets: 3, unilateral: true },
@@ -39,8 +39,8 @@ describe("addTemplateExercisesToLibrary", () => {
 			{ name: "Squat", targetSets: 3 },
 		], new Set());
 		expect(JSON.parse(JSON.stringify(library))).toEqual([
-			{ name: "Bulgarian split squat", unilateral: true },
-			{ name: "Walking Lunge", unilateral: true },
+			{ name: "Bulgarian split squat" },
+			{ name: "Walking Lunge" },
 			{ name: "Squat" },
 		]);
 	});

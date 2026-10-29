@@ -807,6 +807,20 @@ describe("WorkoutView unilateral exercises", () => {
 		expect(element(cardRoot, ".ln-exercise-previous").textContent).toBe("Previous: 20 kg x 10 / 8");
 	});
 
+	it.each([
+		[true, false, 1],
+		[false, true, 2],
+	] as const)("an explicit template flag wins over the library (library: %s, template: %s)", (library, template, inputs) => {
+		const { view, root, plugin } = setup();
+		plugin.settings.exerciseLibrary = [{ name: "Lunge", ...(library ? { unilateral: true } : {}) }];
+		view.startFromTemplate({
+			type: "workout-template", name: "Legs", exercises: [{ name: "Lunge", targetSets: 1, unilateral: template }],
+		});
+		const row = element(root, ".ln-sets-container .ln-set-row");
+		expect(row.querySelectorAll(".ln-reps-input")).toHaveLength(inputs);
+		expect(!!view["exerciseCards"][0]!.getExercise().unilateral).toBe(template);
+	});
+
 	it("takes the flag from the template and writes no repsRight for bilateral exercises", async () => {
 		const { view, root, plugin } = setup();
 		view.startFromTemplate({

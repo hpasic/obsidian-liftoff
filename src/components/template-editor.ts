@@ -116,16 +116,21 @@ export class TemplateEditorModal extends Modal {
 
 			// Weight rows only, by the type the row's dropdown shows
 			if (type === "weight") {
+				// The row's own flag, else the library's. A toggle writes it
+				// explicitly, false included, so "off" overrides the library.
+				let perSide = ex.unilateral ?? this.library.some(
+					(e) => e.unilateral === true && e.name.toLowerCase() === ex.name.toLowerCase()
+				);
 				const sidesBtn = main.createEl("button", {
-					cls: `ln-te-sides-btn ${ex.unilateral ? "ln-te-sides-btn-active" : ""}`.trimEnd(),
+					cls: `ln-te-sides-btn ${perSide ? "ln-te-sides-btn-active" : ""}`.trimEnd(),
 					text: "Per side",
-					attr: { "aria-label": "Log left and right reps", "aria-pressed": String(!!ex.unilateral) },
+					attr: { "aria-label": "Log left and right reps", "aria-pressed": String(perSide) },
 				});
 				sidesBtn.addEventListener("click", () => {
-					if (ex.unilateral) delete ex.unilateral;
-					else ex.unilateral = true;
-					sidesBtn.toggleClass("ln-te-sides-btn-active", !!ex.unilateral);
-					sidesBtn.setAttr("aria-pressed", String(!!ex.unilateral));
+					perSide = !perSide;
+					ex.unilateral = perSide;
+					sidesBtn.toggleClass("ln-te-sides-btn-active", perSide);
+					sidesBtn.setAttr("aria-pressed", String(perSide));
 				});
 			}
 

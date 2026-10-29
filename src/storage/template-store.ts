@@ -36,7 +36,8 @@ export class TemplateStore {
 							rawType === "weight" || rawType === "timer" || rawType === "duration"
 								? rawType
 								: undefined,
-						...(ex.unilateral === true ? { unilateral: true } : {}),
+						// Explicit false is kept: it overrides a unilateral library entry
+						...(typeof ex.unilateral === "boolean" ? { unilateral: ex.unilateral } : {}),
 					});
 				}
 			}
@@ -69,8 +70,8 @@ export class TemplateStore {
 			if (ex.exerciseType) {
 				lines.push(`    exerciseType: ${ex.exerciseType}`);
 			}
-			if (ex.unilateral && (ex.exerciseType ?? "weight") === "weight") {
-				lines.push(`    unilateral: true`);
+			if (typeof ex.unilateral === "boolean" && (ex.exerciseType ?? "weight") === "weight") {
+				lines.push(`    unilateral: ${ex.unilateral}`);
 			}
 		}
 		lines.push("---");

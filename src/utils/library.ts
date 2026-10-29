@@ -15,16 +15,12 @@ export function addTemplateExercisesToLibrary(
 		const source = catalogNames.has(ex.name.toLowerCase()) ? "catalog" : undefined;
 		const existing = library.find((e) => e.name.toLowerCase() === ex.name.toLowerCase());
 		if (!existing) {
-			const entry: ExerciseLibraryEntry = { name: ex.name, exerciseType: ex.exerciseType, source };
-			if (ex.unilateral) entry.unilateral = true;
-			library.push(entry);
+			// Left/right stays per template: a template's "Per side" never sets the library flag
+			library.push({ name: ex.name, exerciseType: ex.exerciseType, source });
 			continue;
 		}
 		if (!existing.exerciseType && ex.exerciseType) {
 			existing.exerciseType = ex.exerciseType;
-		}
-		if (!existing.unilateral && ex.unilateral) {
-			existing.unilateral = true;
 		}
 	}
 }
