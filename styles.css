@@ -1413,6 +1413,8 @@
 
 .ln-te-exercise-row {
 	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
 	justify-content: space-between;
 	align-items: center;
 	padding: 12px;
@@ -1436,6 +1438,8 @@
 	align-items: center;
 	gap: 6px;
 	flex-shrink: 0;
+	/* Stays right-aligned when it wraps onto its own line */
+	margin-left: auto;
 }
 
 .ln-te-sets-btn {
@@ -1453,8 +1457,9 @@
 }
 
 .ln-te-exercise-main {
-	flex: 1;
-	min-width: 0;
+	/* The basis decides when the row wraps: the name never drops below 60px */
+	flex: 1 1 60px;
+	min-width: 60px;
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;

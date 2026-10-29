@@ -99,8 +99,10 @@ export class TemplateEditorModal extends Modal {
 
 		for (let i = 0; i < this.template.exercises.length; i++) {
 			const ex = this.template.exercises[i]!;
-			const isTimer = ex.exerciseType === "timer";
-			const isDuration = ex.exerciseType === "duration";
+			// Icon and count label follow the type the row's dropdown shows
+			const type = this.effectiveType(ex);
+			const isTimer = type === "timer";
+			const isDuration = type === "duration";
 			const countLabel = isTimer ? "intervals" : isDuration ? "holds" : "sets";
 			const row = this.listEl.createDiv({ cls: "ln-te-exercise-row" });
 
@@ -113,7 +115,7 @@ export class TemplateEditorModal extends Modal {
 			main.createSpan({ cls: "ln-te-exercise-name", text: nameText });
 
 			// Weight rows only, by the type the row's dropdown shows
-			if (this.effectiveType(ex) === "weight") {
+			if (type === "weight") {
 				const sidesBtn = main.createEl("button", {
 					cls: `ln-te-sides-btn ${ex.unilateral ? "ln-te-sides-btn-active" : ""}`.trimEnd(),
 					text: "Per side",
@@ -127,8 +129,11 @@ export class TemplateEditorModal extends Modal {
 				});
 			}
 
+			// Its own row item, not in the controls: on a phone the row wraps
+			// (name + type, then the counter) instead of squeezing the name
+			this.renderTypeSelect(row, ex);
+
 			const controls = row.createDiv({ cls: "ln-te-exercise-controls" });
-			this.renderTypeSelect(controls, ex);
 
 			const minusBtn = controls.createEl("button", {
 				cls: "ln-te-sets-btn",

@@ -120,6 +120,11 @@ describe("TemplateEditorModal", () => {
 		}, [{ name: "plank", exerciseType: "duration" }], [], onSave).open();
 		const selects = () => Array.from(document.querySelectorAll<HTMLSelectElement>(".ln-te-type-select"));
 		expect(selects().map((s) => s.value)).toEqual(["duration", "timer"]);
+		const labels = () => Array.from(document.querySelectorAll(".ln-te-sets-label")).map((el) => el.textContent);
+		const names = () => Array.from(document.querySelectorAll(".ln-te-exercise-name")).map((el) => el.textContent);
+		// Label and icon agree with the dropdown, which falls back to the library's type
+		expect(labels()).toEqual(["3 holds", "3 intervals"]);
+		expect(names()).toEqual(["\u23F2 Plank", "\u23F1 Row"]);
 
 		const plank = selects()[0]!;
 		plank.value = "weight";
@@ -127,7 +132,8 @@ describe("TemplateEditorModal", () => {
 		const row = selects()[1]!;
 		row.value = "duration";
 		row.dispatchEvent(new Event("change"));
-		expect(document.querySelectorAll(".ln-te-sets-label")[1]!.textContent).toBe("3 holds");
+		expect(labels()).toEqual(["3 sets", "3 holds"]);
+		expect(names()).toEqual(["Plank", "\u23F2 Row"]);
 
 		click(document, ".ln-te-save-btn");
 		expect(onSave.mock.calls[0]![0].exercises).toEqual([
