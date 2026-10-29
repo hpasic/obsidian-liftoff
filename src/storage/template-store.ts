@@ -1,5 +1,6 @@
 import { App, TFile, TFolder, normalizePath, parseYaml } from "obsidian";
-import type { WorkoutTemplate, TemplateExercise, LiftOffSettings } from "../types";
+import type { WorkoutTemplate, TemplateExercise, LiftOffSettings, ExerciseType } from "../types";
+import { retypeTemplateEntries } from "../utils/exercise-retype";
 
 export class TemplateStore {
 	constructor(
@@ -86,6 +87,28 @@ export class TemplateStore {
 		}
 
 		return await this.app.vault.create(filePath, content);
+	}
+
+	/**
+	 * Give every template entry named `name` the type `type`. Edits each file's
+	 * frontmatter in place, so its body, other properties and file name are
+	 * kept. Returns how many files were updated.
+	 */
+	async retypeExercise(name: string, type: ExerciseType): Promise<number> {
+		const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.getSettings().templateFolder));
+		if (!(folder instanceof TFolder)) return 0;
+
+		let updated = 0;
+		for (const file of folder.children) {
+			if (!(file instanceof TFile) || file.extension !== "md") continue;
+			const fm = this.parseFrontmatter(await this.app.vault.read(file));
+			// Check on the parsed copy first: processFrontMatter rewrites the file even when nothing changes
+			if (fm?.type !== "workout-template" || !retypeTemplateEntries(fm.exercises, name, type)) continue;
+			await this.app.fileManager.processFrontMatter(file, (live: Record<string, unknown>) => {
+				if (retypeTemplateEntries(live.exercises, name, type)) updated++;
+			});
+		}
+		return updated;
 	}
 
 	async deleteTemplate(name: string): Promise<void> {

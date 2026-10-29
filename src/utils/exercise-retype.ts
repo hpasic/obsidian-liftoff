@@ -1,4 +1,4 @@
-import type { Exercise, ExerciseLibraryEntry, ExerciseType, WorkoutTemplate } from "../types";
+import type { Exercise, ExerciseLibraryEntry, ExerciseType } from "../types";
 
 export const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
 	weight: "Weight",
@@ -12,25 +12,23 @@ function sameName(a: string, b: string): boolean {
 }
 
 /**
- * Give every template entry named `name` the type `type`, and return the
- * templates that changed so the caller can save them. The type is written
- * explicitly, "weight" included: an entry without one falls back to the
- * library's type, which was the old type until now.
+ * Give every entry named `name` in a template's raw frontmatter `exercises`
+ * the type `type`, in place, and say whether anything changed. Raw entries,
+ * so the caller can edit the file's frontmatter without regenerating it. The
+ * type is written explicitly, "weight" included: an entry without one falls
+ * back to the library's type, which was the old type until now.
  */
-export function retypeTemplateExercises(
-	templates: WorkoutTemplate[],
-	name: string,
-	type: ExerciseType
-): WorkoutTemplate[] {
-	return templates.filter((template) => {
-		let changed = false;
-		for (const ex of template.exercises) {
-			if (!sameName(ex.name, name) || ex.exerciseType === type) continue;
-			ex.exerciseType = type;
-			changed = true;
-		}
-		return changed;
-	});
+export function retypeTemplateEntries(entries: unknown, name: string, type: ExerciseType): boolean {
+	if (!Array.isArray(entries)) return false;
+	let changed = false;
+	for (const entry of entries as unknown[]) {
+		if (typeof entry !== "object" || entry === null) continue;
+		const ex = entry as Record<string, unknown>;
+		if (!sameName(String(ex.name), name) || ex.exerciseType === type) continue;
+		ex.exerciseType = type;
+		changed = true;
+	}
+	return changed;
 }
 
 /** Point the library entry for `name` at `type`, adding the entry if missing. */

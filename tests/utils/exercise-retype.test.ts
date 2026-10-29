@@ -1,36 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
 	retypeExercise,
-	retypeTemplateExercises,
+	retypeTemplateEntries,
 	setLibraryExerciseType,
 	typeChangeNotice,
 } from "../../src/utils/exercise-retype";
-import type { Exercise, ExerciseLibraryEntry, WorkoutTemplate } from "../../src/types";
+import type { Exercise, ExerciseLibraryEntry } from "../../src/types";
 
-function template(name: string, exercises: WorkoutTemplate["exercises"]): WorkoutTemplate {
-	return { type: "workout-template", name, exercises };
-}
-
-describe("retypeTemplateExercises", () => {
-	it("retypes every same-name entry case-insensitively and returns only changed templates", () => {
-		const core = template("Core", [{ name: "plank", targetSets: 3 }, { name: "Crunch", targetSets: 3 }]);
-		const full = template("Full", [{ name: "Plank", targetSets: 2, exerciseType: "timer" }]);
-		const already = template("Done", [{ name: "PLANK", targetSets: 1, exerciseType: "duration" }]);
-		const none = template("Legs", [{ name: "Squat", targetSets: 5 }]);
-		const changed = retypeTemplateExercises([core, full, already, none], "Plank", "duration");
-		expect(changed).toEqual([core, full]);
-		expect(core.exercises).toEqual([
-			{ name: "plank", targetSets: 3, exerciseType: "duration" },
+describe("retypeTemplateEntries", () => {
+	it("retypes every same-name entry case-insensitively and reports a change", () => {
+		const core = [{ name: "plank", targetSets: 3, tags: "x" }, { name: "Crunch", targetSets: 3 }];
+		expect(retypeTemplateEntries(core, "Plank", "duration")).toBe(true);
+		expect(core).toEqual([
+			{ name: "plank", targetSets: 3, tags: "x", exerciseType: "duration" },
 			{ name: "Crunch", targetSets: 3 },
 		]);
-		expect(full.exercises[0]!.exerciseType).toBe("duration");
-		expect(none.exercises[0]!.exerciseType).toBeUndefined();
+		expect(retypeTemplateEntries([{ name: "PLANK", exerciseType: "duration" }], "Plank", "duration")).toBe(false);
+		expect(retypeTemplateEntries([{ name: "Squat" }, null, "junk"], "Plank", "duration")).toBe(false);
+		expect(retypeTemplateEntries(undefined, "Plank", "duration")).toBe(false);
 	});
 
 	it("writes weight explicitly so it overrides the library", () => {
-		const core = template("Core", [{ name: "Plank", targetSets: 3 }]);
-		expect(retypeTemplateExercises([core], "Plank", "weight")).toEqual([core]);
-		expect(core.exercises[0]!.exerciseType).toBe("weight");
+		const core: Record<string, unknown>[] = [{ name: "Plank", targetSets: 3 }];
+		expect(retypeTemplateEntries(core, "Plank", "weight")).toBe(true);
+		expect(core[0]!.exerciseType).toBe("weight");
 	});
 });
 

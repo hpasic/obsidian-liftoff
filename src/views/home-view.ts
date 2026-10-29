@@ -4,7 +4,6 @@ import type { ExerciseType, WorkoutTemplate } from "../types";
 import { TextInputModal, ConfirmModal } from "../components/modals";
 import { TemplateEditorModal } from "../components/template-editor";
 import { addTemplateExercisesToLibrary } from "../utils/library";
-import { retypeTemplateExercises } from "../utils/exercise-retype";
 import { ExerciseLibraryModal } from "../components/exercise-library";
 
 export const HOME_VIEW_TYPE = "liftoff-home";
@@ -322,12 +321,9 @@ export class HomeView extends ItemView {
 		).open();
 	}
 
-	/** Library type change → every template entry with that name. Returns how many templates were saved. */
-	private async retypeTemplates(name: string, type: ExerciseType): Promise<number> {
-		const templates = await this.plugin.templateStore.getTemplates();
-		const changed = retypeTemplateExercises(templates, name, type);
-		for (const template of changed) await this.plugin.templateStore.saveTemplate(template);
-		return changed.length;
+	/** Library type change → every template entry with that name. Returns how many template files were updated. */
+	private retypeTemplates(name: string, type: ExerciseType): Promise<number> {
+		return this.plugin.templateStore.retypeExercise(name, type);
 	}
 
 	async onClose(): Promise<void> {}
