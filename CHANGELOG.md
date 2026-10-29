@@ -2,6 +2,16 @@
 
 All notable changes to LiftOff. Newest first; each release has a `## <version> - <date>` section, which is also what the plugin shows in "What's new" after an update.
 
+## 0.6.0 - 2026-10-29
+
+- Bodyweight sets now earn a **Rep PR** for the most reps you have done at bodyweight.
+- PRs and total volume stay correct when an exercise mixes kg and lbs rows. The summary's volume is shown in your default unit.
+- Tap a row's unit badge to switch that row between kg and lbs. The number stays as you typed it. Completed rows dim the badge, and a bodyweight hint now reads "Previous: 10 reps".
+- Log left and right reps for one-sided exercises. Mark an exercise **Left / right** in the library, or **Per side** in a template, and each set row shows L and R reps. Notes show them as `10 / 8`, volume counts both sides, and PRs use your weaker side.
+- Change an exercise's type after creating it. Editing it in the library updates every template that uses it, with a notice. The exercise card menu has **Change type…**, which asks first if completed sets would be dropped, and template rows have a type dropdown.
+- A started interval timer now survives the app reloading or resuming. Finishing the workout afterwards still keeps its settings and adds "Timer stopped early." Finishing during the "Get ready" count-in saves it as not started.
+- Two workouts on the same day are ordered by start time only when both notes have one. Otherwise they go by file time.
+
 ## 0.5.2 - 2026-10-05
 
 - Finishing a workout after an interval timer's "Get ready" count-in, while it is still running or paused, now keeps the timer's settings and adds "Timer stopped early." to its note, instead of saving it as not started.
