@@ -1,13 +1,14 @@
 import { Menu } from "obsidian";
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
-import { applyToBests, detectPRs, type PRBests, type PRKind } from "../utils/sets";
+import { applyToBests, detectPRs, formatReps, type PRBests, type PRKind } from "../utils/sets";
 import { DurationSetRow } from "./duration-set-row";
 import { SetRow } from "./set-row";
 import { TimerBlock } from "./timer-block";
 
 export interface ExerciseCardCallbacks {
 	onExerciseChanged: (exercise: Exercise) => void;
+	onTimerStartedChanged?: (started: boolean) => void;
 	onSetCompleted?: (set: WorkoutSet) => void;
 	onMoveUp?: () => void;
 	onMoveDown?: () => void;
@@ -16,6 +17,8 @@ export interface ExerciseCardCallbacks {
 	canMoveUp?: () => boolean;
 	canMoveDown?: () => boolean;
 	onRemove?: () => void;
+	/** "Change type…" — the owner picks the type, confirms, retypes, then calls rebuild(). */
+	onChangeType?: () => void;
 }
 
 interface SetRowLike {
@@ -127,8 +130,8 @@ export class ExerciseCard {
 	}
 
 	private renderMenuButton(parentEl: HTMLElement): void {
-		const { onMoveUp, onMoveDown, onRemove } = this.callbacks;
-		if (!onMoveUp && !onMoveDown && !onRemove) return;
+		const { onMoveUp, onMoveDown, onRemove, onChangeType } = this.callbacks;
+		if (!onMoveUp && !onMoveDown && !onRemove && !onChangeType) return;
 
 		const menuBtn = parentEl.createEl("button", {
 			cls: "ln-exercise-menu-btn",
@@ -148,6 +151,11 @@ export class ExerciseCard {
 			if (onMoveDown && (this.callbacks.canMoveDown?.() ?? true)) {
 				menu.addItem((item) =>
 					item.setTitle("Move down").setIcon("arrow-down").onClick(() => onMoveDown())
+				);
+			}
+			if (onChangeType) {
+				menu.addItem((item) =>
+					item.setTitle("Change type\u2026").setIcon("repeat").onClick(() => onChangeType())
 				);
 			}
 			if (onRemove) {
@@ -294,6 +302,10 @@ export class ExerciseCard {
 			transitionSec,
 			intervals,
 			{
+				onStarted: () => {
+					this.callbacks.onTimerStartedChanged?.(true);
+					this.notifyChanged();
+				},
 				onCompleted: () => {
 					const count = this.timerBlock?.getState().intervals ?? intervals;
 					this.exercise.sets = Array.from({ length: count }, () => ({
@@ -313,6 +325,7 @@ export class ExerciseCard {
 				},
 				onReset: () => {
 					this.exercise.sets = [];
+					this.callbacks.onTimerStartedChanged?.(false);
 					this.notifyChanged();
 				},
 			},
@@ -325,14 +338,17 @@ export class ExerciseCard {
 		const colHeaders = this.containerEl.createDiv({ cls: "ln-set-row ln-set-header" });
 		colHeaders.createSpan({ cls: "ln-set-number", text: "SET" });
 		colHeaders.createSpan({ cls: "ln-set-input", text: "WEIGHT" });
-		colHeaders.createSpan({ cls: "ln-set-input", text: "REPS" });
+		colHeaders.createSpan({ cls: "ln-set-input", text: this.exercise.unilateral ? "L / R" : "REPS" });
 
 		// Previous hint
 		if (this.lastData && this.lastData.sets.length > 0) {
 			const lastSet = this.lastData.sets[this.lastData.sets.length - 1]!;
+			const reps = formatReps(lastSet);
 			this.containerEl.createDiv({
 				cls: "ln-exercise-previous",
-				text: `Previous: ${lastSet.weight} ${lastSet.unit} x ${lastSet.reps}`,
+				text: lastSet.weight > 0
+					? `Previous: ${lastSet.weight} ${lastSet.unit} x ${reps}`
+					: `Previous: ${reps} reps`,
 			});
 		}
 
@@ -353,6 +369,7 @@ export class ExerciseCard {
 				unit: lastSet && lastSet.weight > 0 ? lastSet.unit : this.settings.weightUnit,
 				completed: false,
 			};
+			if (this.exercise.unilateral) newSet.repsRight = 0;
 			this.exercise.sets.push(newSet);
 			this.render();
 			this.notifyChanged();
@@ -365,16 +382,13 @@ export class ExerciseCard {
 
 		for (let i = 0; i < this.exercise.sets.length; i++) {
 			const set = this.exercise.sets[i]!;
-			const previousSet = this.lastData?.sets[i];
-			const hint = previousSet
-				? `${previousSet.weight} x ${previousSet.reps}`
-				: null;
+			const previousSet = this.lastData?.sets[i] ?? null;
 
 			const row = new SetRow(
 				this.setsContainerEl,
 				i + 1,
 				set,
-				hint,
+				previousSet,
 				{
 					onSetChanged: (updatedSet) => {
 						this.exercise.sets[i] = updatedSet;
@@ -406,7 +420,8 @@ export class ExerciseCard {
 						this.render();
 						this.notifyChanged();
 					},
-				}
+				},
+				{ unilateral: this.exercise.unilateral }
 			);
 			this.setRows.push(row);
 
@@ -465,6 +480,17 @@ export class ExerciseCard {
 	private setExpanded(expanded: boolean): void {
 		this.expanded = expanded;
 		this.containerEl.toggleClass("ln-exercise-collapsed", !expanded);
+	}
+
+	/**
+	 * Re-render this card's body after its exercise changed type. Only this
+	 * card's rows and timer are torn down; the root element (and anything
+	 * mounted beside it, like the rest timer) stays.
+	 */
+	rebuild(): void {
+		this.prKindsByIndex.clear();
+		this.recomputeBests();
+		this.render();
 	}
 
 	getRootEl(): HTMLElement {

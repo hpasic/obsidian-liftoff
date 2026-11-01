@@ -12,13 +12,14 @@ Mobile-first gym workout tracker for [Obsidian](https://obsidian.md). Log sets, 
 - Start workouts from templates or build your own
 - Log sets with weight and reps, pre-filled from your last session
 - Tag sets as warmup, working, drop, or failure — just tap the set number to cycle
-- Automatic personal-record detection with a 🏆 badge the moment you beat a best
+- Automatic personal-record detection with a 🏆 badge the moment you beat a best, including most reps at bodyweight
+- Left and right reps for one-sided exercises, and a per-row kg/lbs switch
 - Post-workout summary appended to every note: duration, working sets, total volume, and PRs
 - Duration exercises — a count-up stopwatch for planks, dead hangs, and L-sits, with a get-set buffer and optional added weight
 - Built-in rest timer with auto-start, plus an interval timer for HIIT
 - Free-text notes per exercise, shown again next session
 - Keeps the screen awake while a timer is running
-- Exercise library with search, backed by a built-in catalog of 1,300+ exercises
+- Exercise library with search, backed by a built-in catalog of 1,300+ exercises, and exercise types you can change later
 - Workout history stored as plain markdown files
 - Works great on mobile
 
@@ -26,17 +27,20 @@ Mobile-first gym workout tracker for [Obsidian](https://obsidian.md). Log sets, 
 
 Log sets with weight and reps. Previous session data is pre-filled so you can pick up where you left off. Tap the set number to cycle its type — **W**armup, working, **D**rop, or **F**ailure — and warmups and drop sets are automatically excluded from volume and PR calculations. Add a free-text note to any exercise to capture how it felt. Next session, that note appears under the exercise name, so "increase weight next time" is right where you need it. An exercise with a note is saved even if you completed no sets, and it doesn't hide your previous numbers: pre-fill still comes from the last session where you actually logged sets. An interval timer you never started is saved as not started, with its note but without its settings.
 
+Each weight row has a unit badge: tap it to switch that row between kg and lbs without changing the number you typed. For one-sided exercises, mark the exercise **Left / right** in the library (or **Per side** in a template) and each set row takes L and R reps. Notes show them as `10 / 8`, volume counts both sides, and PRs use the weaker side.
+
 ![Active workout](screenshots/workout-active.png)
 
 ### Personal records
 
-When a working set beats your history, LiftOff flashes a 🏆 badge on the row. It tracks three kinds of PR:
+When a working set beats your history, LiftOff flashes a 🏆 badge on the row. It tracks four kinds of PR:
 
 - **Heaviest weight** ever lifted for the exercise
 - **Best estimated 1RM** (Epley: `weight × (1 + reps / 30)`)
 - **Best single-set volume** (`weight × reps`)
+- **Rep PR**: most reps at bodyweight
 
-Bests update mid-workout, so back-to-back PRs both light up.
+Bests update mid-workout, so back-to-back PRs both light up. PRs and total volume stay correct when an exercise mixes kg and lbs rows.
 
 ### Post-workout summary
 
@@ -64,6 +68,8 @@ While any timer or hold is running, LiftOff keeps the screen from turning off. T
 ### Exercise catalog
 
 Adding an exercise searches your own library and a built-in catalog of 1,300+ exercises at once. Search by name, muscle, or equipment — shorthand like `db curl` works — or tap a body-part chip to browse. Each result shows its target muscle and equipment, and anything missing is one tap away with **+ Create**. The catalog is bundled with the plugin, so it works offline.
+
+You can change an exercise's type (weight, interval timer, or hold) after creating it. Editing the type in the library updates every template that uses it, and **Change type…** in an exercise card's menu changes it mid-workout, asking first if completed sets would be dropped. Template rows also have a type dropdown.
 
 <p align="center">
   <img src="screenshots/exercise-catalog.png" width="300" alt="Exercise picker searching the built-in catalog, with body-part filter chips" />

@@ -1,6 +1,10 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type { ExerciseLibraryEntry, ExerciseType } from "../types";
+import { typeChangeNotice } from "../utils/exercise-retype";
 import { ConfirmModal } from "./modals";
+
+/** Pushes a saved type change to the templates; resolves to how many changed. */
+export type OnExerciseTypeChanged = (name: string, type: ExerciseType) => Promise<number>;
 
 export class ExerciseLibraryModal extends Modal {
 	private library: ExerciseLibraryEntry[];
@@ -11,7 +15,8 @@ export class ExerciseLibraryModal extends Modal {
 	constructor(
 		app: App,
 		library: ExerciseLibraryEntry[],
-		onSave: (library: ExerciseLibraryEntry[]) => void
+		onSave: (library: ExerciseLibraryEntry[]) => void,
+		private onTypeChanged?: OnExerciseTypeChanged
 	) {
 		super(app);
 		this.library = library.map((e) => ({ ...e }));
@@ -65,6 +70,9 @@ export class ExerciseLibraryModal extends Modal {
 			nameRow.createSpan({ cls: "ln-el-type-badge", text: "\u23F2" });
 		}
 		nameRow.createSpan({ cls: "ln-el-name", text: entry.name });
+		if (entry.unilateral) {
+			nameRow.createSpan({ cls: "ln-el-unilateral-badge", text: "L / R" });
+		}
 
 		if (entry.notes) {
 			info.createDiv({ cls: "ln-el-notes-preview", text: entry.notes });
@@ -146,6 +154,29 @@ export class ExerciseLibraryModal extends Modal {
 		timerBtn.addEventListener("click", () => setActive("timer"));
 		durationBtn.addEventListener("click", () => setActive("duration"));
 
+		// Sides toggle — weight exercises only: left and right reps per set
+		const sidesRow = row.createDiv({ cls: "ln-el-type-row ln-el-sides-row" });
+		sidesRow.createSpan({ cls: "ln-el-edit-label", text: "Reps" });
+		const sidesToggle = sidesRow.createDiv({ cls: "ln-el-type-toggle" });
+		let unilateral = entry.unilateral === true;
+		const bothBtn = sidesToggle.createEl("button", { cls: "ln-el-type-btn ln-el-sides-both", text: "Both sides" });
+		const eachBtn = sidesToggle.createEl("button", { cls: "ln-el-type-btn ln-el-sides-each", text: "Left / right" });
+		const renderSides = (): void => {
+			bothBtn.toggleClass("ln-el-type-btn-active", !unilateral);
+			eachBtn.toggleClass("ln-el-type-btn-active", unilateral);
+			sidesRow.toggleClass("ln-el-hidden", currentType !== "weight");
+		};
+		bothBtn.addEventListener("click", () => {
+			unilateral = false;
+			renderSides();
+		});
+		eachBtn.addEventListener("click", () => {
+			unilateral = true;
+			renderSides();
+		});
+		for (const btn of [weightBtn, timerBtn, durationBtn]) btn.addEventListener("click", renderSides);
+		renderSides();
+
 		// Notes
 		row.createDiv({ cls: "ln-el-edit-label", text: "Notes" });
 		const notesInput = row.createEl("textarea", {
@@ -173,15 +204,29 @@ export class ExerciseLibraryModal extends Modal {
 		saveBtn.addEventListener("click", () => {
 			const newName = nameInput.value.trim();
 			if (!newName) return;
+			// Templates still carry the name they were saved with
+			const oldName = entry.name;
+			const typeChanged = (entry.exerciseType ?? "weight") !== currentType;
 			entry.name = newName;
 			entry.exerciseType = currentType === "weight" ? undefined : currentType;
+			if (currentType === "weight" && unilateral) entry.unilateral = true;
+			else delete entry.unilateral;
 			entry.notes = notesInput.value.trim() || undefined;
 			this.editingIndex = null;
 			this.save();
 			this.renderList();
+			if (typeChanged) this.propagateType(oldName, newName, currentType);
 		});
 
 		window.activeWindow.setTimeout(() => nameInput.focus(), 50);
+	}
+
+	private propagateType(oldName: string, newName: string, type: ExerciseType): void {
+		if (!this.onTypeChanged) return;
+		void this.onTypeChanged(oldName, type).then(
+			(count) => new Notice(typeChangeNotice(newName, type, count)),
+			(e) => new Notice(`Error updating templates: ${String(e)}`)
+		);
 	}
 
 	private save(): void {

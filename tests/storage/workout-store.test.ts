@@ -5,11 +5,12 @@ import { workoutToFrontmatter } from "../../src/utils/frontmatter";
 import { DEFAULT_SETTINGS, type Workout } from "../../src/types";
 import { findLastSetsForExercise } from "../../src/utils/history";
 
-/** Just enough YAML for what workoutToFrontmatter writes: scalars, quoted strings, flow maps. */
+/** Just enough YAML for what workoutToFrontmatter writes: scalars, booleans, quoted strings, flow maps. */
 function scalar(raw: string): unknown {
 	const value = raw.trim();
 	if (value.startsWith('"')) return JSON.parse(value) as string;
 	if (value === "[]") return [];
+	if (value === "true" || value === "false") return value === "true";
 	return value !== "" && !isNaN(Number(value)) ? Number(value) : value;
 }
 
@@ -39,7 +40,10 @@ function parseFrontmatter(yaml: string): Record<string, unknown> {
 }
 
 function storeFor(workout: Workout) {
-	const file = Object.assign(new TFile(), { path: "Workouts/w.md", basename: "w" });
+	const file = Object.assign(new TFile(), {
+		path: "Workouts/w.md", basename: "w",
+		stat: { mtime: new Date(`${workout.date}T${workout.start}`).getTime() },
+	});
 	const folder = Object.assign(new TFolder(), { path: "Workouts", children: [file] });
 	const frontmatter = parseFrontmatter(workoutToFrontmatter(workout));
 	const app = {
@@ -60,6 +64,24 @@ const base: Workout = {
 };
 
 describe("WorkoutStore.parseWorkoutFile round-trip", () => {
+	it("keeps left and right reps on a unilateral exercise and feeds both to the next session", () => {
+		const lunge = {
+			name: "Walking Lunge", unilateral: true, note: undefined,
+			sets: [{ weight: 20, reps: 10, repsRight: 8, unit: "kg" as const, completed: true }],
+		};
+		const parsed = roundTrip({ ...base, exercises: [lunge] });
+		expect(parsed?.exercises).toEqual([lunge]);
+		expect(findLastSetsForExercise([parsed!], "walking lunge")?.sets).toEqual(lunge.sets);
+	});
+
+	it("loads a note without repsRight unchanged", () => {
+		const bench = { name: "Bench", note: undefined, sets: [{ weight: 80, reps: 5, unit: "kg" as const, completed: true }] };
+		const parsed = roundTrip({ ...base, exercises: [bench] });
+		expect(parsed?.exercises).toEqual([bench]);
+		expect(parsed?.exercises[0]).not.toHaveProperty("unilateral");
+		expect(parsed?.exercises[0]!.sets[0]).not.toHaveProperty("repsRight");
+	});
+
 	it("keeps a stopped-early timer's config and marker through markdown and parsing", () => {
 		const timer = {
 			name: "Tabata", exerciseType: "timer" as const, sets: [],
@@ -122,6 +144,52 @@ describe("WorkoutStore.parseWorkoutFile round-trip", () => {
 });
 
 describe("WorkoutStore.getRecentWorkouts", () => {
+	it("orders same-day notes totally: valid starts first by start, the rest by mtime", () => {
+		// A < C < B < A under the old pairwise rule; the result depended on folder order
+		const notes = [
+			{ name: "A", start: "18:00", mtime: "19:00" },
+			{ name: "B", start: undefined, mtime: "20:00" },
+			{ name: "C", start: "08:00", mtime: "21:00" },
+			{ name: "D", start: "invalid", mtime: "22:00" },
+		];
+		const files = notes.map((n) => Object.assign(new TFile(), {
+			path: `Workouts/${n.name}.md`, basename: n.name,
+			stat: { mtime: new Date(`2026-09-24T${n.mtime}`).getTime() },
+		}));
+		const frontmatter = notes.map((n) => ({ type: "workout", date: base.date, start: n.start, exercises: [] }));
+		const orders = [files, [...files].reverse(), [files[1]!, files[3]!, files[0]!, files[2]!]];
+		for (const children of orders) {
+			const folder = Object.assign(new TFolder(), { children });
+			const app = {
+				vault: { getAbstractFileByPath: () => folder },
+				metadataCache: { getFileCache: (file: TFile) => ({ frontmatter: frontmatter[files.indexOf(file)] }) },
+			} as unknown as App;
+			const store = new WorkoutStore(app, () => DEFAULT_SETTINGS);
+			expect(store.getRecentWorkouts().map((w) => w.filename)).toEqual(["A", "C", "D", "B"]);
+		}
+	});
+
+	it.each([undefined, "invalid"])("ranks the note with a valid start newer (other: %s)", (otherStart) => {
+		const files = ["valid", "other"].map((name, i) => Object.assign(new TFile(), {
+			path: `Workouts/${name}.md`, basename: name,
+			stat: { mtime: new Date(`2026-09-24T${i === 0 ? "20:00" : "19:00"}`).getTime() },
+		}));
+		const frontmatter = files.map((_, i) => ({
+			type: "workout", date: base.date, start: i === 0 ? "08:00" : otherStart, exercises: [],
+		}));
+		// Both input orders agree.
+		for (const children of [files, [...files].reverse()]) {
+			const folder = Object.assign(new TFolder(), { children });
+			const app = {
+				vault: { getAbstractFileByPath: () => folder },
+				metadataCache: { getFileCache: (file: TFile) => ({ frontmatter: frontmatter[files.indexOf(file)] }) },
+			} as unknown as App;
+			const store = new WorkoutStore(app, () => DEFAULT_SETTINGS);
+			expect(store.getRecentWorkouts().map((w) => w.path)).toEqual(files.map((f) => f.path));
+			expect(store.getRecentWorkouts(1)[0]!.path).toBe(files[0]!.path);
+		}
+	});
+
 	it.each([
 		["08:00", "18:00"],
 		[undefined, undefined],

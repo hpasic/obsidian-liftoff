@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice, TFile, normalizePath } from "obsidian";
 import type LiftOffPlugin from "../main";
-import type { WorkoutTemplate } from "../types";
+import type { ExerciseType, WorkoutTemplate } from "../types";
 import { TextInputModal, ConfirmModal } from "../components/modals";
 import { TemplateEditorModal } from "../components/template-editor";
 import { addTemplateExercisesToLibrary } from "../utils/library";
@@ -316,8 +316,14 @@ export class HomeView extends ItemView {
 					await this.plugin.saveSettings();
 					await this.renderHome();
 				})();
-			}
+			},
+			(name, type) => this.retypeTemplates(name, type)
 		).open();
+	}
+
+	/** Library type change → every template entry with that name. Returns how many template files were updated. */
+	private retypeTemplates(name: string, type: ExerciseType): Promise<number> {
+		return this.plugin.templateStore.retypeExercise(name, type);
 	}
 
 	async onClose(): Promise<void> {}

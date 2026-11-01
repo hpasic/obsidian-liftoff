@@ -1,14 +1,15 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type LiftOffPlugin from "../main";
-import type { ActiveWorkout, Workout, Exercise, ExerciseType } from "../types";
+import type { ActiveWorkout, Workout, Exercise, ExerciseType, WorkoutSet } from "../types";
 import type { WorkoutTemplate } from "../types";
 import { ExerciseCard, type ExerciseCardCallbacks } from "../components/exercise-card";
 import { ExercisePickerModal, type ExerciseSource } from "../components/exercise-picker";
-import { ConfirmModal } from "../components/modals";
+import { ConfirmModal, ExerciseTypeModal } from "../components/modals";
 import { TimerModal } from "./timer-view";
 import { findLastSetsForExercise } from "../utils/history";
 import { remapIndexAfterRemoval, remapIndexAfterSwap } from "../utils/reorder";
 import { computeBests } from "../utils/sets";
+import { EXERCISE_TYPE_LABELS, retypeExercise, setLibraryExerciseType } from "../utils/exercise-retype";
 import { buildWorkoutSummary, renderSummaryMarkdown } from "../utils/summary";
 import { formatLocalDate } from "../utils/date";
 import { WakeLockClaim } from "../utils/wake-lock";
@@ -22,6 +23,8 @@ export class WorkoutView extends ItemView {
 	private plugin: LiftOffPlugin;
 	private workout: Workout;
 	private exerciseCards: ExerciseCard[] = [];
+	/** Object identity keeps runtime state with its exercise across moves/removals. */
+	private startedTimers = new Set<Exercise>();
 	private startTime: Date;
 	private timerIntervalId: number | null = null;
 	private hasElapsedTimerCleanup = false;
@@ -74,12 +77,19 @@ export class WorkoutView extends ItemView {
 		return entry?.exerciseType ?? "weight";
 	}
 
+	private lookupUnilateral(name: string): boolean {
+		return this.plugin.settings.exerciseLibrary.some(
+			(e) => e.unilateral === true && e.name.toLowerCase() === name.toLowerCase()
+		);
+	}
+
 	startFromTemplate(template: WorkoutTemplate): void {
 		this.initialized = true;
 		// A reused view instance may still be running the previous workout's rest timer
 		this.stopRestTimer();
 		this.workout = this.createEmptyWorkout();
 		this.workout.template = template.name;
+		this.startedTimers.clear();
 		this.workout.exercises = template.exercises.map((te) => {
 			const exerciseType = te.exerciseType ?? this.lookupExerciseType(te.name);
 			if (exerciseType === "timer") {
@@ -105,12 +115,15 @@ export class WorkoutView extends ItemView {
 					})),
 				};
 			}
+			const unilateral = te.unilateral ?? this.lookupUnilateral(te.name);
 			return {
 				name: te.name,
 				exerciseType: exerciseType,
-				sets: Array.from({ length: te.targetSets }, () => ({
+				...(unilateral ? { unilateral } : {}),
+				sets: Array.from({ length: te.targetSets }, (): WorkoutSet => ({
 					weight: 0,
 					reps: 0,
+					...(unilateral ? { repsRight: 0 } : {}),
 					unit: this.plugin.settings.weightUnit,
 					completed: false,
 				})),
@@ -127,6 +140,7 @@ export class WorkoutView extends ItemView {
 		this.initialized = true;
 		this.stopRestTimer();
 		this.workout = this.createEmptyWorkout();
+		this.startedTimers.clear();
 		this.startTime = new Date();
 		this.loadRecentWorkouts();
 		this.renderWorkout();
@@ -136,6 +150,11 @@ export class WorkoutView extends ItemView {
 	resume(active: ActiveWorkout): void {
 		this.initialized = true;
 		this.workout = active.workout;
+		this.startedTimers = new Set(
+			(active.startedTimerIndices ?? [])
+				.map((i) => this.workout.exercises[i])
+				.filter((e): e is Exercise => e?.exerciseType === "timer")
+		);
 		this.startTime = new Date(active.startTimeMs);
 		this.loadRecentWorkouts();
 		this.renderWorkout();
@@ -167,6 +186,7 @@ export class WorkoutView extends ItemView {
 					if (prev) {
 						exercise.sets[i]!.weight = prev.weight;
 						exercise.sets[i]!.reps = prev.reps;
+						if (exercise.unilateral) exercise.sets[i]!.repsRight = prev.repsRight ?? 0;
 						exercise.sets[i]!.unit = prev.weight > 0 ? prev.unit : this.plugin.settings.weightUnit;
 						if (prev.setType) exercise.sets[i]!.setType = prev.setType;
 					}
@@ -201,7 +221,9 @@ export class WorkoutView extends ItemView {
 
 	private async persistState(): Promise<void> {
 		if (!this.initialized) return;
-		await this.plugin.persistActiveWorkout(this.collectWorkout(), this.startTime.getTime());
+		const workout = this.collectWorkout();
+		const startedTimerIndices = workout.exercises.flatMap((e, i) => this.startedTimers.has(e) ? [i] : []);
+		await this.plugin.persistActiveWorkout(workout, this.startTime.getTime(), startedTimerIndices);
 	}
 
 	private renderWorkout(): void {
@@ -288,6 +310,10 @@ export class WorkoutView extends ItemView {
 		let card: ExerciseCard;
 		const indexOf = () => this.exerciseCards.indexOf(card);
 		const callbacks: ExerciseCardCallbacks = {
+			onTimerStartedChanged: (started) => {
+				if (started) this.startedTimers.add(exercise);
+				else this.startedTimers.delete(exercise);
+			},
 			onExerciseChanged: () => {
 				void this.persistState();
 			},
@@ -298,6 +324,9 @@ export class WorkoutView extends ItemView {
 			},
 			onRemove: () => {
 				void this.removeExercise(indexOf());
+			},
+			onChangeType: () => {
+				void this.changeExerciseType(card);
 			},
 			canMoveUp: () => indexOf() > 0,
 			canMoveDown: () => {
@@ -421,6 +450,7 @@ export class WorkoutView extends ItemView {
 		}
 
 		const lastData = findLastSetsForExercise(this.recentWorkouts, name);
+		const unilateral = exerciseType === "weight" && this.lookupUnilateral(name);
 
 		let newExercise: Exercise;
 		if (exerciseType === "timer") {
@@ -454,21 +484,28 @@ export class WorkoutView extends ItemView {
 			newExercise = {
 				name,
 				exerciseType,
+				...(unilateral ? { unilateral } : {}),
 				sets: [
 					{
 						weight: 0,
 						reps: 0,
+						...(unilateral ? { repsRight: 0 } : {}),
 						unit: this.plugin.settings.weightUnit,
 						completed: false,
 					},
 				],
 			};
 			if (lastData && lastData.sets.length > 0) {
-				newExercise.sets = lastData.sets.map((s) => ({
-					...s,
-					unit: s.weight > 0 ? s.unit : this.plugin.settings.weightUnit,
-					completed: false,
-				}));
+				newExercise.sets = lastData.sets.map((s) => {
+					// Right side only on unilateral exercises, whatever the history logged
+					const { repsRight, ...rest } = s;
+					return {
+						...rest,
+						...(unilateral ? { repsRight: repsRight ?? 0 } : {}),
+						unit: s.weight > 0 ? s.unit : this.plugin.settings.weightUnit,
+						completed: false,
+					};
+				});
 			}
 		}
 
@@ -533,6 +570,7 @@ export class WorkoutView extends ItemView {
 		card.destroy();
 		this.exerciseCards.splice(at, 1);
 		this.workout.exercises.splice(at, 1);
+		this.startedTimers.delete(exercise);
 
 		if (this.activeRestExerciseIndex !== null) {
 			const nextRestIndex = remapIndexAfterRemoval(this.activeRestExerciseIndex, at);
@@ -544,6 +582,44 @@ export class WorkoutView extends ItemView {
 			}
 		}
 
+		void this.persistState();
+	}
+
+	/**
+	 * Swap one card's body to another type in place. Like reorder/remove, no
+	 * other card is rebuilt, so their running timers and holds keep going.
+	 */
+	private async changeExerciseType(card: ExerciseCard): Promise<void> {
+		const exercise = card.getExercise();
+		const current = exercise.exerciseType ?? "weight";
+		const type = await new ExerciseTypeModal(this.app, exercise.name, current).openAndWait();
+		if (!type) return;
+
+		const completed = exercise.sets.filter((s) => s.completed).length;
+		const label = EXERCISE_TYPE_LABELS[type].toLowerCase();
+		let loss: string | null = null;
+		if (completed > 0) {
+			loss = `Its ${completed} completed set${completed === 1 ? "" : "s"} will be discarded.`;
+		} else if (card.hasUnfinishedTimer()) {
+			loss = "Its running timer will be stopped.";
+		}
+		if (loss) {
+			const confirmed = await new ConfirmModal(
+				this.app,
+				`Change "${exercise.name}" to ${label}? ${loss}`
+			).openAndWait();
+			if (!confirmed) return;
+		}
+
+		// The card may have been removed while a modal was open
+		if (!this.exerciseCards.includes(card)) return;
+
+		retypeExercise(exercise, type, this.plugin.settings.weightUnit);
+		// A run of the old timer must not mark the new one "stopped early"
+		this.startedTimers.delete(exercise);
+		card.rebuild();
+		setLibraryExerciseType(this.plugin.settings.exerciseLibrary, exercise.name, type);
+		void this.plugin.saveSettings();
 		void this.persistState();
 	}
 
@@ -560,7 +636,7 @@ export class WorkoutView extends ItemView {
 			.map((e, i): Exercise => {
 				const sets = e.sets.filter((s) => s.completed);
 				if (e.exerciseType === "timer" && sets.length === 0) {
-					if (this.exerciseCards[i]?.hasUnfinishedTimer()) {
+					if (this.startedTimers.has(e) || this.exerciseCards[i]?.hasUnfinishedTimer()) {
 						return { ...e, sets, note: [e.note?.trim(), "Timer stopped early."].filter(Boolean).join("\n") };
 					}
 					// Never run: drop the config so the note can't pass for a completed timer
@@ -584,7 +660,7 @@ export class WorkoutView extends ItemView {
 		};
 
 		try {
-			const summary = buildWorkoutSummary(finished, this.recentWorkouts);
+			const summary = buildWorkoutSummary(finished, this.recentWorkouts, this.plugin.settings.weightUnit);
 			const summaryMd = renderSummaryMarkdown(summary);
 			await this.plugin.workoutStore.saveWorkout(finished, summaryMd);
 			await this.plugin.clearActiveWorkout();

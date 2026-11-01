@@ -185,8 +185,8 @@ export default class LiftOffPlugin extends Plugin {
 		}
 	}
 
-	async persistActiveWorkout(workout: Workout, startTimeMs: number): Promise<void> {
-		this.activeWorkout = { workout, startTimeMs };
+	async persistActiveWorkout(workout: Workout, startTimeMs: number, startedTimerIndices: number[] = []): Promise<void> {
+		this.activeWorkout = { workout, startTimeMs, startedTimerIndices };
 		await this.savePluginData();
 	}
 

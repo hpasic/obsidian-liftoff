@@ -1,5 +1,6 @@
 import { App, Modal } from "obsidian";
-import type { WorkoutTemplate, ExerciseLibraryEntry, TemplateExercise } from "../types";
+import type { WorkoutTemplate, ExerciseLibraryEntry, ExerciseType, TemplateExercise } from "../types";
+import { EXERCISE_TYPE_LABELS } from "../utils/exercise-retype";
 import { ExercisePickerModal } from "./exercise-picker";
 
 export class TemplateEditorModal extends Modal {
@@ -56,6 +57,8 @@ export class TemplateEditorModal extends Modal {
 						targetSets: 3,
 						exerciseType: exerciseType === "weight" ? undefined : exerciseType,
 					};
+					const entry = this.library.find((e) => e.name.toLowerCase() === name.toLowerCase());
+					if (exerciseType === "weight" && entry?.unilateral) row.unilateral = true;
 					if (source === "catalog") this.catalogRows.add(row);
 					this.template.exercises.push(row);
 					this.renderExercises();
@@ -96,8 +99,10 @@ export class TemplateEditorModal extends Modal {
 
 		for (let i = 0; i < this.template.exercises.length; i++) {
 			const ex = this.template.exercises[i]!;
-			const isTimer = ex.exerciseType === "timer";
-			const isDuration = ex.exerciseType === "duration";
+			// Icon and count label follow the type the row's dropdown shows
+			const type = this.effectiveType(ex);
+			const isTimer = type === "timer";
+			const isDuration = type === "duration";
 			const countLabel = isTimer ? "intervals" : isDuration ? "holds" : "sets";
 			const row = this.listEl.createDiv({ cls: "ln-te-exercise-row" });
 
@@ -105,7 +110,33 @@ export class TemplateEditorModal extends Modal {
 			if (isTimer) nameText = `\u23F1 ${ex.name}`;
 			else if (isDuration) nameText = `\u23F2 ${ex.name}`;
 			else nameText = ex.name;
-			row.createSpan({ cls: "ln-te-exercise-name", text: nameText });
+			// Name with the per-side toggle under it, so the controls keep their width on a phone
+			const main = row.createDiv({ cls: "ln-te-exercise-main" });
+			main.createSpan({ cls: "ln-te-exercise-name", text: nameText });
+
+			// Weight rows only, by the type the row's dropdown shows
+			if (type === "weight") {
+				// The row's own flag, else the library's. A toggle writes it
+				// explicitly, false included, so "off" overrides the library.
+				let perSide = ex.unilateral ?? this.library.some(
+					(e) => e.unilateral === true && e.name.toLowerCase() === ex.name.toLowerCase()
+				);
+				const sidesBtn = main.createEl("button", {
+					cls: `ln-te-sides-btn ${perSide ? "ln-te-sides-btn-active" : ""}`.trimEnd(),
+					text: "Per side",
+					attr: { "aria-label": "Log left and right reps", "aria-pressed": String(perSide) },
+				});
+				sidesBtn.addEventListener("click", () => {
+					perSide = !perSide;
+					ex.unilateral = perSide;
+					sidesBtn.toggleClass("ln-te-sides-btn-active", perSide);
+					sidesBtn.setAttr("aria-pressed", String(perSide));
+				});
+			}
+
+			// Its own row item, not in the controls: on a phone the row wraps
+			// (name + type, then the counter) instead of squeezing the name
+			this.renderTypeSelect(row, ex);
 
 			const controls = row.createDiv({ cls: "ln-te-exercise-controls" });
 
@@ -144,6 +175,30 @@ export class TemplateEditorModal extends Modal {
 				this.renderExercises();
 			});
 		}
+	}
+
+	/** The row's own type, else the library's. */
+	private effectiveType(ex: TemplateExercise): ExerciseType {
+		return ex.exerciseType
+			?? this.library.find((e) => e.name.toLowerCase() === ex.name.toLowerCase())?.exerciseType
+			?? "weight";
+	}
+
+	/** Per-row type. Shows the effective type: the row's own, else the library's. */
+	private renderTypeSelect(parentEl: HTMLElement, ex: TemplateExercise): void {
+		const select = parentEl.createEl("select", {
+			cls: "ln-te-type-select dropdown",
+			attr: { "aria-label": "Exercise type" },
+		});
+		for (const type of ["weight", "timer", "duration"] as const) {
+			select.createEl("option", { text: EXERCISE_TYPE_LABELS[type], attr: { value: type } });
+		}
+		select.value = this.effectiveType(ex);
+		select.addEventListener("change", () => {
+			// Explicit, "weight" included, so it wins over the library's type
+			ex.exerciseType = select.value as ExerciseType;
+			this.renderExercises();
+		});
 	}
 
 	onClose(): void {

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceLeaf } from "obsidian";
 import type LiftOffPlugin from "../../src/main";
 import { WorkoutView } from "../../src/views/workout-view";
-import { DEFAULT_SETTINGS, type Exercise, type Workout } from "../../src/types";
+import { DEFAULT_SETTINGS, type ActiveWorkout, type Exercise, type Workout } from "../../src/types";
 import { DurationSetRow } from "../../src/components/duration-set-row";
 import { screenWakeLock } from "../../src/utils/wake-lock";
 import { workoutToFullMarkdown } from "../../src/utils/frontmatter";
@@ -14,7 +14,7 @@ afterEach(async () => {
 	for (const view of views.splice(0)) await view.onClose();
 });
 
-function setup(exercises: Exercise[] = [], history: Workout[] = []) {
+function setup(exercises: Exercise[] = [], history: Workout[] = [], startedTimerIndices?: number[]) {
 	const plugin = {
 		settings: { ...DEFAULT_SETTINGS, holdBufferSeconds: 0, exerciseLibrary: [] },
 		workoutStore: {
@@ -33,7 +33,7 @@ function setup(exercises: Exercise[] = [], history: Workout[] = []) {
 	};
 	const view = new WorkoutView({ app: {} } as unknown as WorkspaceLeaf, plugin as unknown as LiftOffPlugin);
 	document.body.appendChild(view.containerEl);
-	view.resume({ workout, startTimeMs: Date.now() });
+	view.resume({ workout, startTimeMs: Date.now(), startedTimerIndices });
 	views.push(view);
 	return { view, workout, plugin, root: view.containerEl };
 }
@@ -99,7 +99,7 @@ describe("WorkoutView structure", () => {
 		expect(view["exerciseCards"][0]).toBe(second);
 		click(first!.getRootEl(), ".ln-exercise-menu-btn");
 		expect(Array.from(document.querySelectorAll(".menu button")).map((el) => el.textContent))
-			.toEqual(["Move up", "Remove exercise"]);
+			.toEqual(["Move up", "Change type\u2026", "Remove exercise"]);
 		click(document, ".menu button");
 		expect(view["exerciseCards"][0]).toBe(first);
 		menuAction(second!.getRootEl(), "Remove exercise");
@@ -160,6 +160,143 @@ describe("WorkoutView structure", () => {
 		await Promise.resolve();
 		expectParallel(view, workout, ["A", "C"]);
 		expect(card.getRootEl().isConnected).toBe(false);
+	});
+});
+
+async function changeType(card: HTMLElement, type: "weight" | "timer" | "duration") {
+	menuAction(card, "Change type…");
+	click(document, `.modal .ln-type-choice-btn[data-type="${type}"]`);
+	for (let i = 0; i < 3; i++) await Promise.resolve();
+}
+
+describe("WorkoutView change type", () => {
+	it("swaps a card with no completed sets to the timer block in place and updates the library", async () => {
+		const { view, workout, plugin } = setup([exercise("A"), exercise("Plank")]);
+		const card = view["exerciseCards"][1]!;
+		const root = card.getRootEl();
+		const live = card.getExercise();
+		await changeType(root, "timer");
+		expect(document.querySelector(".modal")).toBeNull(); // No confirm without completed sets
+		expect(view["exerciseCards"][1]).toBe(card);
+		expect(card.getRootEl()).toBe(root);
+		expect(card.getExercise()).toBe(live);
+		expect(workout.exercises[1]).toBe(live);
+		expect(live).toMatchObject({ exerciseType: "timer", sets: [], workSeconds: 40, intervals: 5 });
+		expect(card["timerBlock"]).not.toBeNull();
+		expect(root.querySelector(".ln-set-row:not(.ln-set-header)")).toBeNull();
+		expect(plugin.settings.exerciseLibrary).toEqual([{ name: "Plank", exerciseType: "timer" }]);
+		expect(plugin.saveSettings).toHaveBeenCalled();
+		expect(plugin.persistActiveWorkout).toHaveBeenCalled();
+	});
+
+	it("confirms before dropping completed sets, and keeps them on cancel", async () => {
+		const plank = exercise("Plank");
+		plank.sets = [
+			{ weight: 10, reps: 5, unit: "kg", completed: false },
+			{ weight: 10, reps: 5, unit: "kg", completed: false },
+		];
+		const { view, plugin } = setup([plank]);
+		const card = view["exerciseCards"][0]!;
+		click(card.getRootEl(), ".ln-set-check");
+
+		await changeType(card.getRootEl(), "duration");
+		expect(element(document, ".modal .ln-modal-message").textContent)
+			.toBe("Change \"Plank\" to duration? Its 1 completed set will be discarded.");
+		click(document, ".modal button:not(.mod-cta)");
+		await Promise.resolve();
+		expect(plank.exerciseType).toBe("weight");
+		expect(plank.sets.filter((s) => s.completed)).toHaveLength(1);
+		expect(plugin.settings.exerciseLibrary).toEqual([]);
+
+		await changeType(card.getRootEl(), "duration");
+		click(document, ".modal .mod-cta");
+		await Promise.resolve();
+		expect(plank.exerciseType).toBe("duration");
+		expect(plank.sets).toEqual([{ weight: 10, reps: 0, unit: "kg", completed: false, durationSeconds: 0 }]);
+		expect(card["setRows"][0]).toBeInstanceOf(DurationSetRow);
+		expect(plugin.settings.exerciseLibrary).toEqual([{ name: "Plank", exerciseType: "duration" }]);
+	});
+
+	it("leaves other cards' running timer, hold and the rest timer untouched", async () => {
+		const tracking = trackIntervals();
+		const { view, workout } = setup([exercise("Timer", "timer"), exercise("Hold", "duration"), exercise("Other"), exercise("Rest")]);
+		const [timerCard, holdCard, other, restOwner] = view["exerciseCards"];
+		const timer = timerCard!["timerBlock"]!;
+		const hold = holdCard!["setRows"][0] as DurationSetRow;
+		click(timerCard!.getRootEl(), ".ln-timer-block-start-btn");
+		click(hold.getRootEl(), ".ln-duration-action");
+		click(restOwner!.getRootEl(), ".ln-set-check");
+		vi.advanceTimersByTime(2000);
+		const ids = tracking.ids();
+
+		await changeType(other!.getRootEl(), "duration");
+		expectParallel(view, workout, ["Timer", "Hold", "Other", "Rest"]);
+		expect(other!.getExercise().exerciseType).toBe("duration");
+		expect(timerCard!["timerBlock"]).toBe(timer);
+		expect(holdCard!["setRows"][0]).toBe(hold);
+		expect(tracking.ids()).toEqual(ids);
+		expect(tracking.clear).not.toHaveBeenCalled();
+		const rest = element(view.containerEl, ".ln-rest-timer");
+		expect(rest.previousElementSibling).toBe(restOwner!.getRootEl());
+		vi.advanceTimersByTime(2000);
+		expect(element(timerCard!.getRootEl(), ".ln-timer-block-countdown").textContent).toBe("6");
+		expect(element(hold.getRootEl(), ".ln-duration-display").textContent).toBe("0:04");
+		expect(element(rest, ".ln-rest-timer-value").textContent).toBe("0:04");
+	});
+
+	it("confirms before stopping its own running timer, and tears down only that interval", async () => {
+		const tracking = trackIntervals();
+		const { view } = setup([exercise("Tabata", "timer")]);
+		const card = view["exerciseCards"][0]!;
+		click(card.getRootEl(), ".ln-timer-block-start-btn");
+		const timerId = tracking.ids().at(-1)!;
+		vi.advanceTimersByTime(15_000); // Past the count-in: a real run
+		await changeType(card.getRootEl(), "weight");
+		expect(element(document, ".modal .ln-modal-message").textContent)
+			.toBe("Change \"Tabata\" to weight? Its running timer will be stopped.");
+		click(document, ".modal .mod-cta");
+		await Promise.resolve();
+		expect(card.getExercise()).toEqual({ name: "Tabata", exerciseType: "weight", sets: [{ weight: 0, reps: 0, unit: "kg", completed: false }] });
+		tracking.expectClearedOnce([timerId]);
+		expect(vi.getTimerCount()).toBe(1); // Workout elapsed timer remains
+	});
+
+	it("forgets the old run: timer -> weight -> timer finishes as not started", async () => {
+		const { view, root, plugin } = setup([exercise("Tabata", "timer")]);
+		const card = view["exerciseCards"][0]!;
+		click(card.getRootEl(), ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(15_000); // Past the count-in: a real run
+		await changeType(card.getRootEl(), "weight");
+		click(document, ".modal .mod-cta");
+		await Promise.resolve();
+		await changeType(card.getRootEl(), "timer");
+		const persisted = plugin.persistActiveWorkout.mock.calls.at(-1)!;
+		expect(persisted[2]).toEqual([]); // No started-timer index survives
+		input(root, ".ln-exercise-note-input", "swapped");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: "swapped" }]);
+		expect(workoutToFullMarkdown(saved)).toContain("_Not started._");
+	});
+
+	it("drops left/right when a unilateral exercise becomes another type", async () => {
+		const lunge: Exercise = { name: "Lunge", exerciseType: "weight", unilateral: true,
+			sets: [{ weight: 0, reps: 0, repsRight: 0, unit: "kg", completed: false }] };
+		const { view } = setup([lunge]);
+		await changeType(view["exerciseCards"][0]!.getRootEl(), "duration");
+		expect(lunge.unilateral).toBeUndefined();
+		await changeType(view["exerciseCards"][0]!.getRootEl(), "weight");
+		expect(lunge.unilateral).toBeUndefined();
+		expect(view.containerEl.querySelector(".ln-reps-right")).toBeNull();
+	});
+
+	it("does nothing when the current type is picked", async () => {
+		const { view, plugin } = setup([exercise("A")]);
+		const card = view["exerciseCards"][0]!;
+		const rows = card["setRows"];
+		await changeType(card.getRootEl(), "weight");
+		expect(card["setRows"]).toBe(rows);
+		expect(plugin.saveSettings).not.toHaveBeenCalled();
 	});
 });
 
@@ -310,6 +447,17 @@ async function finish(root: HTMLElement) {
 }
 
 describe("WorkoutView finish", () => {
+	it("saves summary volume in the settings unit when rows use another unit", async () => {
+		const bench = exercise("Bench");
+		bench.sets = [{ weight: 50, reps: 5, unit: "kg", completed: false }];
+		const { root, plugin } = setup([bench]);
+		plugin.settings.weightUnit = "lbs";
+		click(root, ".ln-set-check");
+		await finish(root);
+		const summary = plugin.workoutStore.saveWorkout.mock.calls[0]![1] as string;
+		expect(summary).toContain("- **Total volume**: 551.2 lbs");
+	});
+
 	it.each([false, true])("does not save a timer finished during count-in without a note (paused: %s)", async (paused) => {
 		const { root, plugin } = setup([exercise("Tabata", "timer")]);
 		click(root, ".ln-timer-block-start-btn");
@@ -319,12 +467,15 @@ describe("WorkoutView finish", () => {
 		expect(plugin.clearActiveWorkout).not.toHaveBeenCalled();
 	});
 
-	it.each([false, true])("saves a timer finished during count-in with a note as not started (paused: %s)", async (paused) => {
+	it.each([
+		[0, false], [0, true], [9_999, false], [9_999, true],
+	] as const)("saves count-in as not started after %i ms (paused: %s)", async (elapsed, paused) => {
 		const timer = { ...exercise("Tabata", "timer"), transitionSeconds: 5 };
 		const { root, plugin } = setup([timer]);
 		click(root, ".ln-timer-block-start-btn");
-		vi.advanceTimersByTime(9_000); // Still in count-in, just before the first work phase
+		vi.advanceTimersByTime(elapsed);
 		input(root, ".ln-exercise-note-input", "ran out of time");
+		expect(plugin.persistActiveWorkout).toHaveBeenLastCalledWith(expect.anything(), expect.any(Number), []);
 		if (paused) click(root, ".ln-timer-block-control-btn");
 		await finish(root);
 		expect(plugin.workoutStore.saveWorkout).toHaveBeenCalledTimes(1);
@@ -344,7 +495,8 @@ describe("WorkoutView finish", () => {
 		const timer = { ...exercise("Tabata", "timer"), transitionSeconds: 5 };
 		const { root, plugin } = setup([timer]);
 		click(root, ".ln-timer-block-start-btn");
-		vi.advanceTimersByTime(15_000); // Count-in finished; first work interval still running
+		vi.advanceTimersByTime(10_000); // First work interval has just begun
+		expect(plugin.persistActiveWorkout).toHaveBeenLastCalledWith(expect.anything(), expect.any(Number), [0]);
 		if (note) input(root, ".ln-exercise-note-input", note);
 		if (paused) click(root, ".ln-timer-block-control-btn");
 		await finish(root);
@@ -356,6 +508,71 @@ describe("WorkoutView finish", () => {
 		expect(markdown).toContain("Intervals: 3 × 0:40 work / 0:20 rest / 0:05 switch");
 		expect(markdown).not.toContain("_Not started._");
 		expect(timer.note).toBe(note); // Save leaves the live note untouched
+	});
+
+	it.each([false, true])("finishes a restored started timer without restarting its work interval (count-in: %s)", async (countIn) => {
+		const timer = { ...exercise("Tabata", "timer"), note: "feeling tired" };
+		const { root, plugin } = setup([timer, exercise("Tabata", "timer")], [], [0]);
+		expect(root.querySelector(".ln-timer-block-countdown")).toBeNull();
+		if (countIn) click(root, ".ln-timer-block-start-btn");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ ...timer, note: "feeling tired\nTimer stopped early." }]);
+		expect(saved).not.toHaveProperty("startedTimerIndices");
+		expect(saved.exercises[0]).not.toHaveProperty("startedTimerIndices");
+		const markdown = workoutToFullMarkdown(saved);
+		expect(markdown).toContain("Intervals: 3 × 0:40 work / 0:20 rest");
+		expect(markdown).toContain("> Timer stopped early.");
+		expect(markdown).not.toContain("startedTimerIndices");
+	});
+
+	it("persists the first work interval immediately and finishes after a JSON round-trip and resume", async () => {
+		const { view, root, plugin } = setup([exercise("Tabata", "timer")]);
+		click(root, ".ln-timer-block-start-btn");
+		expect(plugin.persistActiveWorkout).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(10_000);
+		const [workout, startTimeMs, startedTimerIndices] = plugin.persistActiveWorkout.mock.lastCall!;
+		const restored = JSON.parse(JSON.stringify({ workout, startTimeMs, startedTimerIndices })) as ActiveWorkout;
+		expect(restored.startedTimerIndices).toEqual([0]);
+		view.resume(restored);
+		expect(root.querySelector(".ln-timer-block-countdown")).toBeNull();
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ ...restored.workout.exercises[0], note: "Timer stopped early." }]);
+	});
+
+	it("keeps started markers attached to duplicate-name exercises through moves and removals", async () => {
+		const { view, root, plugin } = setup([exercise("Same", "timer"), exercise("Same", "timer"), exercise("Other")]);
+		const [neverStarted, started, other] = view["exerciseCards"];
+		click(started!.getRootEl(), ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(10_000);
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([1]);
+		menuAction(started!.getRootEl(), "Move up");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		menuAction(other!.getRootEl(), "Remove exercise");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		menuAction(started!.getRootEl(), "Move down");
+		menuAction(neverStarted!.getRootEl(), "Remove exercise");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		const [workout, startTimeMs, startedTimerIndices] = plugin.persistActiveWorkout.mock.lastCall!;
+		view.resume(JSON.parse(JSON.stringify({ workout, startTimeMs, startedTimerIndices })) as ActiveWorkout);
+		await finish(root);
+		expect((plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout).exercises[0]?.note).toBe("Timer stopped early.");
+	});
+
+	it("clears the started marker when a completed timer is reset", async () => {
+		const timer = { ...exercise("Tabata", "timer"), workSeconds: 1, intervals: 1, note: "try again later" };
+		const { root, plugin } = setup([timer]);
+		click(root, ".ln-timer-block-start-btn");
+		vi.advanceTimersByTime(11_000);
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([0]);
+		click(root, ".ln-timer-block-reset-btn");
+		expect(plugin.persistActiveWorkout.mock.lastCall?.[2]).toEqual([]);
+		click(root, ".ln-timer-block-start-btn");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: timer.note }]);
+		expect(workoutToFullMarkdown(saved)).toContain("_Not started._");
 	});
 
 	it("keeps an exercise with a note even when none of its sets was completed", async () => {
@@ -453,6 +670,29 @@ describe("WorkoutView history auto-fill", () => {
 		expect(element(root, ".ln-weight-input").getAttribute("aria-label")).toBe("Weight (kg)");
 	});
 
+	it("saves a toggled unit with the typed weight and auto-fills it next time", async () => {
+		const history: Workout[] = [{
+			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
+			exercises: [{ name: "Bench", sets: [{ weight: 225, reps: 5, unit: "kg", completed: true }] }],
+		}];
+		const { view, root, plugin } = setup([], history);
+		add(root, "Bench");
+		click(root, ".ln-set-weight-unit");
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("lbs");
+		expect(element<HTMLInputElement>(root, ".ln-weight-input").value).toBe("225");
+		click(root, ".ln-set-check");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises[0]!.sets).toEqual([{ weight: 225, reps: 5, unit: "lbs", completed: true }]);
+
+		history.unshift({ ...saved, date: "2026-09-21" });
+		view.startFromTemplate({
+			type: "workout-template", name: "Push", exercises: [{ name: "Bench", targetSets: 1 }],
+		});
+		expect(view["exerciseCards"][0]!.getExercise().sets[0]).toMatchObject({ weight: 225, unit: "lbs" });
+		expect(element(root, ".ln-set-weight-unit").textContent).toBe("lbs");
+	});
+
 	it.each(["template", "added"] as const)("keeps kg weights displayed, edited and copied in kg with lbs settings (%s)", async (source) => {
 		const weightHistory: Workout[] = [{
 			type: "workout", template: null, date: "2026-09-20", start: "18:00", end: "18:30", duration: 30,
@@ -530,5 +770,74 @@ describe("WorkoutView history auto-fill", () => {
 		expect(element(card.getRootEl(), ".ln-duration-previous").textContent).toBe("prev 1:00 @ 24 kg");
 		expect(element(card.getRootEl(), ".ln-exercise-previous-note").textContent)
 			.toBe("Last note (2026-09-22): skipped, grip sore");
+	});
+});
+
+describe("WorkoutView unilateral exercises", () => {
+	it("logs L and R from a library pick, saves both, and pre-fills them next time", async () => {
+		const history: Workout[] = [];
+		const { view, root, plugin } = setup([], history);
+		plugin.settings.exerciseLibrary = [{ name: "Walking Lunge", unilateral: true }];
+		click(root, ".ln-add-exercise-btn");
+		input(document, ".ln-exercise-search", "walking lunge");
+		click(document, ".ln-exercise-result");
+		input(root, ".ln-weight-input", "20");
+		input(root, ".ln-reps-left", "10");
+		input(root, ".ln-reps-right", "8");
+		click(root, ".ln-set-check");
+		await finish(root);
+		const [saved, summary] = plugin.workoutStore.saveWorkout.mock.calls[0]! as [Workout, string];
+		expect(saved.exercises).toEqual([{
+			name: "Walking Lunge", exerciseType: "weight", unilateral: true,
+			sets: [{ weight: 20, reps: 10, repsRight: 8, unit: "kg", completed: true }],
+		}]);
+		expect(workoutToFullMarkdown(saved)).toContain("| 1   | 20 kg  | 10 / 8 |");
+		expect(summary).toContain("- **Total volume**: 360 kg");
+
+		history.unshift({ ...saved, date: "2026-09-20" });
+		view.startFromTemplate({
+			type: "workout-template", name: "Legs", exercises: [{ name: "Walking Lunge", targetSets: 2 }],
+		});
+		const card = view["exerciseCards"][0]!;
+		expect(card.getExercise()).toMatchObject({ unilateral: true });
+		expect(card.getExercise().sets.map((s) => [s.reps, s.repsRight])).toEqual([[10, 8], [0, 0]]);
+		const cardRoot = card.getRootEl();
+		expect(element<HTMLInputElement>(cardRoot, ".ln-reps-left").value).toBe("10");
+		expect(element<HTMLInputElement>(cardRoot, ".ln-reps-right").value).toBe("8");
+		expect(element(cardRoot, ".ln-exercise-previous").textContent).toBe("Previous: 20 kg x 10 / 8");
+	});
+
+	it.each([
+		[true, false, 1],
+		[false, true, 2],
+	] as const)("an explicit template flag wins over the library (library: %s, template: %s)", (library, template, inputs) => {
+		const { view, root, plugin } = setup();
+		plugin.settings.exerciseLibrary = [{ name: "Lunge", ...(library ? { unilateral: true } : {}) }];
+		view.startFromTemplate({
+			type: "workout-template", name: "Legs", exercises: [{ name: "Lunge", targetSets: 1, unilateral: template }],
+		});
+		const row = element(root, ".ln-sets-container .ln-set-row");
+		expect(row.querySelectorAll(".ln-reps-input")).toHaveLength(inputs);
+		expect(!!view["exerciseCards"][0]!.getExercise().unilateral).toBe(template);
+	});
+
+	it("takes the flag from the template and writes no repsRight for bilateral exercises", async () => {
+		const { view, root, plugin } = setup();
+		view.startFromTemplate({
+			type: "workout-template", name: "Legs",
+			exercises: [{ name: "Pistol Squat", targetSets: 1, unilateral: true }, { name: "Squat", targetSets: 1 }],
+		});
+		const [pistol, squat] = view["exerciseCards"].map((c) => c.getExercise());
+		expect(pistol!.sets[0]).toHaveProperty("repsRight", 0);
+		expect(squat).not.toHaveProperty("unilateral");
+		const rows = root.querySelectorAll(".ln-sets-container .ln-set-row");
+		expect(rows[0]!.querySelectorAll(".ln-reps-input")).toHaveLength(2);
+		expect(rows[1]!.querySelectorAll(".ln-reps-input")).toHaveLength(1);
+		input(rows[1]!, ".ln-reps-input", "5");
+		click(rows[1]!, ".ln-set-check");
+		await finish(root);
+		const saved = plugin.workoutStore.saveWorkout.mock.calls[0]![0] as Workout;
+		expect(saved.exercises).toEqual([{ name: "Squat", exerciseType: "weight", sets: [{ weight: 0, reps: 5, unit: "kg", completed: true }] }]);
+		expect(workoutToFullMarkdown(saved)).not.toContain("repsRight");
 	});
 });

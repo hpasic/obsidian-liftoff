@@ -55,6 +55,7 @@ export class WorkoutStore {
 
 		const workouts: RecentWorkout[] = [];
 		const startTimes = new Map<string, number>();
+		const modifiedTimes = new Map<string, number>();
 
 		for (const file of folder.children) {
 			if (!(file instanceof TFile) || file.extension !== "md") continue;
@@ -65,7 +66,8 @@ export class WorkoutStore {
 
 			const date = (fm.date as string) ?? file.basename.substring(0, 10);
 			const startTime = typeof fm.start === "string" ? Date.parse(`${date}T${fm.start}`) : NaN;
-			startTimes.set(file.path, Number.isFinite(startTime) ? startTime : file.stat.mtime);
+			if (Number.isFinite(startTime)) startTimes.set(file.path, startTime);
+			modifiedTimes.set(file.path, file.stat.mtime);
 
 			workouts.push({
 				filename: file.basename,
@@ -79,7 +81,18 @@ export class WorkoutStore {
 			});
 		}
 
-		workouts.sort((a, b) => b.date.localeCompare(a.date) || startTimes.get(b.path)! - startTimes.get(a.path)!);
+		workouts.sort((a, b) => {
+			const dateOrder = b.date.localeCompare(a.date);
+			if (dateOrder !== 0) return dateOrder;
+			// Total order on a date: notes with a valid start rank newer than
+			// notes without; starts order the first group, mtimes the second
+			const aStart = startTimes.get(a.path);
+			const bStart = startTimes.get(b.path);
+			if (aStart !== undefined && bStart !== undefined) return bStart - aStart;
+			if (aStart !== undefined) return -1;
+			if (bStart !== undefined) return 1;
+			return modifiedTimes.get(b.path)! - modifiedTimes.get(a.path)!;
+		});
 		return workouts.slice(0, limit);
 	}
 
@@ -134,6 +147,7 @@ export class WorkoutStore {
 						note,
 					});
 				} else {
+					const unilateral = ex.unilateral === true;
 					const sets: WorkoutSet[] = [];
 					if (Array.isArray(ex.sets)) {
 						for (const s of ex.sets as Array<Record<string, unknown>>) {
@@ -143,16 +157,15 @@ export class WorkoutStore {
 								unit: s.unit === "lbs" ? "lbs" : "kg",
 								completed: true,
 							};
+							if (unilateral) set.repsRight = Number(s.repsRight) || 0;
 							const setType = parseSetType(s.setType);
 							if (setType) set.setType = setType;
 							sets.push(set);
 						}
 					}
-					exercises.push({
-						name: String(ex.name),
-						sets,
-						note,
-					});
+					const parsed: Exercise = { name: String(ex.name), sets, note };
+					if (unilateral) parsed.unilateral = true;
+					exercises.push(parsed);
 				}
 			}
 		}

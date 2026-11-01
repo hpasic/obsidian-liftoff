@@ -348,3 +348,48 @@ describe("not-started timer (note only)", () => {
 		expect(workoutToMarkdownBody(timerWorkout)).toContain("## Burpees\nIntervals: 5 \u00D7 0:40 work / 0:20 rest");
 	});
 });
+
+describe("unilateral exercises", () => {
+	const lungeWorkout: Workout = {
+		...sampleWorkout,
+		exercises: [
+			{ name: "Walking Lunge", unilateral: true, sets: [
+				{ weight: 20, reps: 10, repsRight: 8, unit: "kg", completed: true },
+				{ weight: 0, reps: 12, repsRight: 12, unit: "kg", completed: true, setType: "failure" },
+			] },
+			...sampleWorkout.exercises,
+		],
+	};
+
+	it("writes the flag and repsRight only on the unilateral exercise", () => {
+		const fm = workoutToFrontmatter(lungeWorkout);
+		expect(fm).toContain([
+			"  - name: Walking Lunge",
+			"    unilateral: true",
+			"    sets:",
+			"      - { weight: 20, reps: 10, repsRight: 8, unit: kg }",
+			"      - { weight: 0, reps: 12, repsRight: 12, unit: kg, setType: failure }",
+			"  - name: Bench Press",
+			"    sets:",
+			"      - { weight: 80, reps: 10, unit: kg }",
+		].join("\n"));
+	});
+
+	it("shows both sides in the Reps column", () => {
+		const body = workoutToMarkdownBody(lungeWorkout);
+		expect(body).toContain("| 1   | 20 kg  | 10 / 8 |");
+		expect(body).toContain("| 2 (failure) | 0 kg   | 12 / 12 |");
+		expect(body).toContain("| 1   | 80 kg  | 10   |");
+	});
+
+	it("leaves a non-unilateral workout byte-identical", () => {
+		const plain = workoutToFullMarkdown(sampleWorkout);
+		const strayRight = workoutToFullMarkdown({
+			...sampleWorkout,
+			exercises: [{ ...sampleWorkout.exercises[0]!, sets: sampleWorkout.exercises[0]!.sets.map((s) => ({ ...s, repsRight: 3 })) }],
+		});
+		expect(strayRight).toBe(plain);
+		expect(plain).not.toContain("repsRight");
+		expect(plain).not.toContain("unilateral");
+	});
+});

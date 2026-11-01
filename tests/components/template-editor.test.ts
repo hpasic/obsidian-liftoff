@@ -77,5 +77,88 @@ describe("TemplateEditorModal", () => {
 		pickCatalog("Burpee");
 		expect([...save(onSave)[1]]).toEqual([]);
 	});
-});
 
+	it("copies a library pick's unilateral flag and toggles it per row", () => {
+		const onSave = vi.fn();
+		new TemplateEditorModal({} as never, { type: "workout-template", name: "Legs", exercises: [] },
+			[{ name: "Walking Lunge", unilateral: true }, { name: "Squat" }, { name: "Plank", exerciseType: "duration" }],
+			[], onSave).open();
+		for (const name of ["walking lunge", "squat"]) {
+			click(document, ".ln-te-add-btn");
+			input(document, ".ln-exercise-search", name);
+			click(document, ".ln-exercise-result");
+		}
+		createTimer("Tabata");
+		click(document, ".ln-te-add-btn");
+		input(document, ".ln-exercise-search", "plank");
+		click(document, ".ln-exercise-result");
+		// Library-typed duration row gets no chip; switching it to weight shows one
+		expect(document.querySelectorAll(".ln-te-sides-btn")).toHaveLength(2);
+		const plankType = Array.from(document.querySelectorAll<HTMLSelectElement>(".ln-te-type-select"))[3]!;
+		plankType.value = "weight";
+		plankType.dispatchEvent(new Event("change"));
+		expect(document.querySelectorAll(".ln-te-sides-btn")).toHaveLength(3);
+		const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".ln-te-sides-btn")).slice(0, 2);
+		expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
+		buttons[0]!.click();
+		buttons[1]!.click();
+		expect(buttons.map((b) => b.classList.contains("ln-te-sides-btn-active"))).toEqual([false, true]);
+		const [template] = save(onSave);
+		expect(JSON.parse(JSON.stringify(template.exercises))).toEqual([
+			{ name: "Walking Lunge", targetSets: 3, unilateral: false },
+			{ name: "Squat", targetSets: 3, unilateral: true },
+			{ name: "Tabata", targetSets: 3, exerciseType: "timer" },
+			{ name: "Plank", targetSets: 3, exerciseType: "weight" },
+		]);
+	});
+
+	it("shows the library's Per side until toggled, then stores it explicitly without touching the library", () => {
+		const onSave = vi.fn();
+		const library = [{ name: "Lunge", unilateral: true }, { name: "Squat" }];
+		new TemplateEditorModal({} as never, {
+			type: "workout-template", name: "Legs",
+			exercises: [{ name: "Lunge", targetSets: 3 }, { name: "Squat", targetSets: 3 }],
+		}, library, [], onSave).open();
+		const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".ln-te-sides-btn"));
+		expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
+		buttons[0]!.click();
+		buttons[1]!.click();
+		expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
+		const [template] = save(onSave);
+		expect(template.exercises).toEqual([
+			{ name: "Lunge", targetSets: 3, unilateral: false },
+			{ name: "Squat", targetSets: 3, unilateral: true },
+		]);
+		expect(library).toEqual([{ name: "Lunge", unilateral: true }, { name: "Squat" }]);
+	});
+
+	it("changes a row's type, showing the library's type until then", () => {
+		const onSave = vi.fn();
+		new TemplateEditorModal({} as never, {
+			type: "workout-template", name: "Core",
+			exercises: [{ name: "Plank", targetSets: 3 }, { name: "Row", targetSets: 3, exerciseType: "timer" }],
+		}, [{ name: "plank", exerciseType: "duration" }], [], onSave).open();
+		const selects = () => Array.from(document.querySelectorAll<HTMLSelectElement>(".ln-te-type-select"));
+		expect(selects().map((s) => s.value)).toEqual(["duration", "timer"]);
+		const labels = () => Array.from(document.querySelectorAll(".ln-te-sets-label")).map((el) => el.textContent);
+		const names = () => Array.from(document.querySelectorAll(".ln-te-exercise-name")).map((el) => el.textContent);
+		// Label and icon agree with the dropdown, which falls back to the library's type
+		expect(labels()).toEqual(["3 holds", "3 intervals"]);
+		expect(names()).toEqual(["\u23F2 Plank", "\u23F1 Row"]);
+
+		const plank = selects()[0]!;
+		plank.value = "weight";
+		plank.dispatchEvent(new Event("change"));
+		const row = selects()[1]!;
+		row.value = "duration";
+		row.dispatchEvent(new Event("change"));
+		expect(labels()).toEqual(["3 sets", "3 holds"]);
+		expect(names()).toEqual(["Plank", "\u23F2 Row"]);
+
+		click(document, ".ln-te-save-btn");
+		expect(onSave.mock.calls[0]![0].exercises).toEqual([
+			{ name: "Plank", targetSets: 3, exerciseType: "weight" },
+			{ name: "Row", targetSets: 3, exerciseType: "duration" },
+		]);
+	});
+});
