@@ -193,8 +193,8 @@ export class LiftOffSettingTab extends PluginSettingTab {
 					.addOption("kg", "Kilograms (kg)")
 					.addOption("lbs", "Pounds (lbs)")
 					.setValue(this.plugin.settings.weightUnit)
-					.onChange(async (value: "kg" | "lbs") => {
-						this.plugin.settings.weightUnit = value;
+					.onChange(async (value) => {
+						this.plugin.settings.weightUnit = value as "kg" | "lbs";
 						await this.plugin.saveSettings();
 					})
 			);
