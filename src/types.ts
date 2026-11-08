@@ -84,6 +84,8 @@ export interface LiftOffSettings {
 	/** Open "What's new" after an update. */
 	showWhatsNew: boolean;
 	exerciseLibrary: ExerciseLibraryEntry[];
+	/** Show / hide reached PRs in workouts */
+	hidePR: boolean;
 }
 
 export const DEFAULT_SETTINGS: LiftOffSettings = {
@@ -98,4 +100,5 @@ export const DEFAULT_SETTINGS: LiftOffSettings = {
 	keepScreenAwake: true,
 	showWhatsNew: true,
 	exerciseLibrary: [],
+	hidePR: false
 };

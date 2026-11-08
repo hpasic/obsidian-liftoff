@@ -99,6 +99,17 @@ export class LiftOffSettingTab extends PluginSettingTab {
 					},
 				],
 			},
+			{
+				type: "group",
+				heading: "Miscellaneous",
+				items: [
+					{
+						name: "Hide personal record notifications",
+						desc: "If personal record popup notifications for exercises shall be hidden",
+						control: { type: "toggle", key: "hidePR" },
+					},
+				],
+			},
 		];
 	}
 
