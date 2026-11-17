@@ -155,6 +155,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 			}
 			case "keepScreenAwake":
 			case "showWhatsNew":
+			case "hidePR":
 				if (typeof value !== "boolean") return;
 				settings[key] = value;
 				break;
@@ -311,5 +312,16 @@ export class LiftOffSettingTab extends PluginSettingTab {
 						}
 					})
 			);
+			
+		new Setting(containerEl)
+			.setName("Hide personal record notifications")
+			.setDesc("If personal record popup notifications for exercises shall be hidden")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.hidePR).onChange(async (value) => {
+					this.plugin.settings.hidePR = value;
+					await this.plugin.saveSettings();
+				})
+			);
+		
 	}
 }
