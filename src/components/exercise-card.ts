@@ -404,7 +404,7 @@ export class ExerciseCard {
 						if (updatedSet.completed) {
 							const prs = detectPRs(updatedSet, this.bests);
 
-							if (prs.length > 0 && this.hidePRNotifications) {
+							if (prs.length > 0 && !this.hidePRNotifications) {
 								this.prKindsByIndex.set(i, prs);
 								row.showPR(prs);
 								applyToBests(updatedSet, this.bests);
