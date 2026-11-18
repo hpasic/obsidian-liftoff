@@ -662,7 +662,7 @@ export class WorkoutView extends ItemView {
 		try {
 			const summary = buildWorkoutSummary(finished, this.recentWorkouts, this.plugin.settings.weightUnit);
 			const summaryMd = renderSummaryMarkdown(summary);
-			await this.plugin.workoutStore.saveWorkout(finished, summaryMd);
+			await this.plugin.workoutStore.saveWorkout(finished, summaryMd, summary);
 			await this.plugin.clearActiveWorkout();
 			const prCount = summary.prs.length;
 			new Notice(prCount > 0 ? `Workout saved! 🏆 ${prCount} PR${prCount === 1 ? "" : "s"}` : "Workout saved!");
