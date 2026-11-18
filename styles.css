@@ -1467,7 +1467,7 @@
 .ln-history-best-label {
 	margin-top: 2px;
 	font-size: 11px;
-	color: var(--text-faint);
+	color: var(--text-muted);
 }
 
 .ln-history-session {
@@ -1486,7 +1486,7 @@
 .ln-history-date {
 	font-size: 12px;
 	font-variant-numeric: tabular-nums;
-	color: var(--text-faint);
+	color: var(--text-muted);
 }
 
 .ln-history-sets {
