@@ -62,11 +62,19 @@ function formatDuration(minutes: number): string {
 	return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
+/** Volume to one decimal: the value shown in `## Summary` and written to frontmatter. */
+export function roundVolume(volume: number): number {
+	return Math.round(volume * 10) / 10;
+}
+
+/** One "Exercise: Weight PR" string per exercise and PR kind, for the `prs` frontmatter property. */
+export function prStrings(summary: WorkoutSummary): string[] {
+	return summary.prs.flatMap((p) => p.kinds.map((k) => `${p.exercise}: ${PR_LABEL[k]}`));
+}
+
 function formatVolume(volume: number): string {
 	// Trim trailing .0 but keep one decimal when meaningful
-	const rounded = Math.round(volume * 10) / 10;
-	const str = rounded.toLocaleString("en-US", { maximumFractionDigits: 1 });
-	return str;
+	return roundVolume(volume).toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 
 export function renderSummaryMarkdown(summary: WorkoutSummary): string {

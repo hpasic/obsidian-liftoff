@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS, type ActiveWorkout, type Exercise, type Workout } fro
 import { DurationSetRow } from "../../src/components/duration-set-row";
 import { screenWakeLock } from "../../src/utils/wake-lock";
 import { workoutToFullMarkdown } from "../../src/utils/frontmatter";
+import type { WorkoutSummary } from "../../src/utils/summary";
 import { click, element, exercise, input, menuAction, trackIntervals } from "../helpers/dom";
 
 const views: WorkoutView[] = [];
@@ -456,6 +457,8 @@ describe("WorkoutView finish", () => {
 		await finish(root);
 		const summary = plugin.workoutStore.saveWorkout.mock.calls[0]![1] as string;
 		expect(summary).toContain("- **Total volume**: 551.2 lbs");
+		const [saved, , stats] = plugin.workoutStore.saveWorkout.mock.calls[0]! as [Workout, string, WorkoutSummary];
+		expect(workoutToFullMarkdown(saved, summary, stats)).toContain("total_volume: 551.2\nvolume_unit: lbs\n");
 	});
 
 	it.each([false, true])("does not save a timer finished during count-in without a note (paused: %s)", async (paused) => {
@@ -616,6 +619,28 @@ describe("WorkoutView finish", () => {
 		expect(saved.exercises).toEqual([{ name: "Tabata", exerciseType: "timer", sets: [], note: "ran out of time" }]);
 		// The live exercise keeps its config
 		expect(timer.workSeconds).toBe(40);
+	});
+});
+
+describe("WorkoutView exercise history", () => {
+	it("opens the history of the tapped exercise from the loaded workouts, newest first", () => {
+		const day = (date: string, weight: number): Workout => ({
+			type: "workout", template: null, date, start: "18:00", end: "18:30", duration: 30,
+			exercises: [{ name: "Bench Press", sets: [{ weight, reps: 8, unit: "kg", completed: true }] }],
+		});
+		const { view } = setup([exercise("Squat"), exercise("Bench Press")], [day("2026-06-08", 90), day("2026-03-20", 80)]);
+		click(view["exerciseCards"][1]!.getRootEl(), ".ln-exercise-name");
+		const modal = element(document, ".ln-history-modal");
+		expect(element(modal, "h3").textContent).toBe("History: Bench Press");
+		expect(Array.from(modal.querySelectorAll(".ln-history-session"), (el) => [
+			element(el, ".ln-history-date").textContent,
+			element(el, ".ln-history-sets").textContent,
+		])).toEqual([["2026-06-08", "90×8 kg"], ["2026-03-20", "80×8 kg"]]);
+		expect(element(modal, ".ln-history-best-value").textContent).toBe("90 kg");
+		click(modal, ".ln-history-buttons button");
+
+		click(view["exerciseCards"][0]!.getRootEl(), ".ln-exercise-name");
+		expect(element(document, ".ln-history-modal .ln-empty-state").textContent).toBe("No sessions yet");
 	});
 });
 
