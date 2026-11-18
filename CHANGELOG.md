@@ -2,6 +2,12 @@
 
 All notable changes to LiftOff. Newest first; each release has a `## <version> - <date>` section, which is also what the plugin shows in "What's new" after an update.
 
+## 0.7.0 - 2026-11-18
+
+- Tap an exercise's name during a workout to see its history: your bests on top, then your recent sessions, newest first, with each session's sets and note. It works for weighted and bodyweight sets, holds, and interval timers. The name can also be reached with Tab and opened with Enter or Space.
+- Saved workouts now carry their stats as properties, so Obsidian Bases and Dataview can chart and tabulate them: `total_volume`, `volume_unit`, `working_sets`, `pr_count`, `prs`, and `exercise_names`. The `## Summary` section is unchanged, and older notes still load.
+- A ready-made Bases table of all your workouts is in the repository at [`docs/bases/Workouts.base`](https://github.com/hpasic/obsidian-liftoff/blob/main/docs/bases/Workouts.base). Copy it into your vault to use it.
+
 ## 0.6.0 - 2026-10-29
 
 - Bodyweight sets now earn a **Rep PR** for the most reps you have done at bodyweight.
