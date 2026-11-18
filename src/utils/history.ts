@@ -55,3 +55,27 @@ export function findLastSetsForExercise(
 	// Only note-only sessions: nothing to pre-fill, but the note still shows
 	return latest ? { date: latest.date, sets: [], note: latest.note, noteDate: latest.date } : null;
 }
+
+export interface ExerciseSession {
+	date: string;
+	exercise: Exercise;
+}
+
+/**
+ * Every session with this exercise, in `workouts` order (newest first), at most
+ * `limit`. Note-only sessions count: they were logged.
+ */
+export function findSessionsForExercise(
+	workouts: Workout[],
+	exerciseName: string,
+	limit: number = Infinity
+): ExerciseSession[] {
+	const nameLower = exerciseName.toLowerCase();
+	const sessions: ExerciseSession[] = [];
+	for (const workout of workouts) {
+		if (sessions.length >= limit) break;
+		const exercise = workout.exercises.find((e) => e.name.toLowerCase() === nameLower);
+		if (exercise) sessions.push({ date: workout.date, exercise });
+	}
+	return sessions;
+}

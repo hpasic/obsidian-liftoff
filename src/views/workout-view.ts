@@ -3,6 +3,7 @@ import type LiftOffPlugin from "../main";
 import type { ActiveWorkout, Workout, Exercise, ExerciseType, WorkoutSet } from "../types";
 import type { WorkoutTemplate } from "../types";
 import { ExerciseCard, type ExerciseCardCallbacks } from "../components/exercise-card";
+import { ExerciseHistoryModal } from "../components/exercise-history-modal";
 import { ExercisePickerModal, type ExerciseSource } from "../components/exercise-picker";
 import { ConfirmModal, ExerciseTypeModal } from "../components/modals";
 import { TimerModal } from "./timer-view";
@@ -327,6 +328,11 @@ export class WorkoutView extends ItemView {
 			},
 			onChangeType: () => {
 				void this.changeExerciseType(card);
+			},
+			// shortcut: covers only the 20 workouts loadRecentWorkouts() reads for hints and PRs,
+			// so a rarely trained exercise lists fewer than 10 sessions; load more there if that bites
+			onShowHistory: () => {
+				new ExerciseHistoryModal(this.app, exercise.name, this.recentWorkouts, this.plugin.settings.weightUnit).open();
 			},
 			canMoveUp: () => indexOf() > 0,
 			canMoveDown: () => {
