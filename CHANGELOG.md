@@ -2,6 +2,10 @@
 
 All notable changes to LiftOff. Newest first; each release has a `## <version> - <date>` section, which is also what the plugin shows in "What's new" after an update.
 
+## 0.7.1 - 2026-11-18
+
+- Styling cleanup for the exercise history link and list, so the plugin passes Obsidian's style checks. Nothing changes in how they work.
+
 ## 0.7.0 - 2026-11-18
 
 - Tap an exercise's name during a workout to see its history: your bests on top, then your recent sessions, newest first, with each session's sets and note. It works for weighted and bodyweight sets, holds, and interval timers. The name can also be reached with Tab and opened with Enter or Space.
