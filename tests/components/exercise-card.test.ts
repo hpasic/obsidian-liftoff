@@ -449,6 +449,32 @@ describe("ExerciseCard", () => {
 	});
 });
 
+describe("ExerciseCard history", () => {
+	it("opens history from the name without collapsing; the rest of the header still collapses", () => {
+		const onShowHistory = vi.fn();
+		const card = new ExerciseCard(document.body, exercise("Bench"), null, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn(), onShowHistory });
+		const root = card.getRootEl();
+		click(root, ".ln-exercise-name.ln-exercise-name-link");
+		expect(onShowHistory).toHaveBeenCalledOnce();
+		expect(root.classList.contains("ln-exercise-collapsed")).toBe(false);
+		click(root, ".ln-exercise-header");
+		expect(root.classList.contains("ln-exercise-collapsed")).toBe(true);
+		expect(onShowHistory).toHaveBeenCalledOnce();
+		card.destroy();
+	});
+
+	it("leaves the name a plain label without a history callback", () => {
+		const card = new ExerciseCard(document.body, exercise("Bench"), null, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn() });
+		const root = card.getRootEl();
+		expect(root.querySelector(".ln-exercise-name-link")).toBeNull();
+		click(root, ".ln-exercise-name");
+		expect(root.classList.contains("ln-exercise-collapsed")).toBe(true);
+		card.destroy();
+	});
+});
+
 describe("ExerciseCard previous note", () => {
 	it.each(["weight", "duration", "timer"] as const)("shows last session's note on a %s card", (type) => {
 		const lastData = { date: "2026-09-20", sets: [], note: "  increase weight next time\n" };

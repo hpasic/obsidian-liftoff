@@ -19,6 +19,8 @@ export interface ExerciseCardCallbacks {
 	onRemove?: () => void;
 	/** "Change type…" — the owner picks the type, confirms, retypes, then calls rebuild(). */
 	onChangeType?: () => void;
+	/** Tap on the exercise name: the owner shows its history. */
+	onShowHistory?: () => void;
 }
 
 interface SetRowLike {
@@ -69,10 +71,19 @@ export class ExerciseCard {
 
 		// Header
 		const header = this.containerEl.createDiv({ cls: "ln-exercise-header" });
-		header.createSpan({
+		const nameEl = header.createSpan({
 			cls: "ln-exercise-name",
 			text: this.exercise.name,
 		});
+		const { onShowHistory } = this.callbacks;
+		if (onShowHistory) {
+			nameEl.addClass("ln-exercise-name-link");
+			nameEl.addEventListener("click", (evt) => {
+				// The rest of the header toggles collapse
+				evt.stopPropagation();
+				onShowHistory();
+			});
+		}
 
 		const headerRight = header.createDiv({ cls: "ln-exercise-header-right" });
 		if (this.lastData) {
