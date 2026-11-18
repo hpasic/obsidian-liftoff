@@ -120,4 +120,16 @@ describe("findSessionsForExercise", () => {
 		expect(findSessionsForExercise([noteOnly, ...workouts], "Bench Press").map((s) => s.date))
 			.toEqual(["2026-03-26", "2026-03-19", "2026-03-15"]);
 	});
+
+	it("combines repeated entries of the exercise in one workout into one session, before the limit", () => {
+		const twice: Workout = { ...workouts[0]!, date: "2026-03-26", exercises: [
+			{ name: "Bench Press", note: "a", sets: [{ weight: 60, reps: 5, unit: "kg", completed: true }] },
+			{ name: "Squat", sets: [] },
+			{ name: "bench press", note: "b", sets: [{ weight: 70, reps: 3, unit: "kg", completed: true }] },
+		] };
+		const sessions = findSessionsForExercise([twice, ...workouts], "Bench Press", 2);
+		expect(sessions.map((s) => s.date)).toEqual(["2026-03-26", "2026-03-19"]);
+		expect(sessions[0]!.exercise.sets.map((x) => x.weight)).toEqual([60, 70]);
+		expect(sessions[0]!.exercise.note).toBe("a\nb");
+	});
 });

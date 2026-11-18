@@ -121,4 +121,11 @@ describe("buildExerciseHistory: holds and timers", () => {
 		]);
 		expect(history.bests).toEqual([]);
 	});
+
+	it("combines a hold done twice in one workout: both entries' sets and the longest hold", () => {
+		const plank = (...sets: WorkoutSet[]): Exercise => ({ name: "Plank", exerciseType: "duration", sets });
+		const history = buildExerciseHistory([workout("2026-06-08", plank(hold(45)), plank(hold(90)))], "Plank", "kg");
+		expect(history.sessions.map((s) => s.sets)).toEqual(["0:45, 1:30"]);
+		expect(history.bests).toEqual([{ label: "Longest hold", value: "1:30" }]);
+	});
 });

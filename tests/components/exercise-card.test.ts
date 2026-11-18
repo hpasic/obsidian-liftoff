@@ -464,6 +464,22 @@ describe("ExerciseCard history", () => {
 		card.destroy();
 	});
 
+	it.each(["Enter", " "])("opens history from the focused name with %j without collapsing or scrolling", (key) => {
+		const onShowHistory = vi.fn();
+		const card = new ExerciseCard(document.body, exercise("Bench"), null, SETTINGS, EMPTY_BESTS,
+			{ onExerciseChanged: vi.fn(), onShowHistory });
+		const root = card.getRootEl();
+		const name = root.querySelector(".ln-exercise-name-link")!;
+		expect(name.getAttribute("role")).toBe("button");
+		expect(name.getAttribute("tabindex")).toBe("0");
+		const evt = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+		name.dispatchEvent(evt);
+		expect(onShowHistory).toHaveBeenCalledOnce();
+		expect(evt.defaultPrevented).toBe(true);
+		expect(root.classList.contains("ln-exercise-collapsed")).toBe(false);
+		card.destroy();
+	});
+
 	it("leaves the name a plain label without a history callback", () => {
 		const card = new ExerciseCard(document.body, exercise("Bench"), null, SETTINGS, EMPTY_BESTS,
 			{ onExerciseChanged: vi.fn() });

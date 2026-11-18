@@ -62,8 +62,23 @@ export interface ExerciseSession {
 }
 
 /**
+ * One exercise from several entries of the same exercise in one workout: sets
+ * and notes in order; type and timer config from the first entry with data.
+ */
+function mergeEntries(entries: Exercise[]): Exercise {
+	if (entries.length === 1) return entries[0]!;
+	const notes = entries.map((e) => e.note?.trim()).filter(Boolean);
+	return {
+		...(entries.find(hasData) ?? entries[0]!),
+		sets: entries.flatMap((e) => e.sets),
+		note: notes.length > 0 ? notes.join("\n") : undefined,
+	};
+}
+
+/**
  * Every session with this exercise, in `workouts` order (newest first), at most
- * `limit`. Note-only sessions count: they were logged.
+ * `limit`. Note-only sessions count: they were logged. A workout that repeats the
+ * exercise is one session combining all its entries.
  */
 export function findSessionsForExercise(
 	workouts: Workout[],
@@ -74,8 +89,8 @@ export function findSessionsForExercise(
 	const sessions: ExerciseSession[] = [];
 	for (const workout of workouts) {
 		if (sessions.length >= limit) break;
-		const exercise = workout.exercises.find((e) => e.name.toLowerCase() === nameLower);
-		if (exercise) sessions.push({ date: workout.date, exercise });
+		const entries = workout.exercises.filter((e) => e.name.toLowerCase() === nameLower);
+		if (entries.length > 0) sessions.push({ date: workout.date, exercise: mergeEntries(entries) });
 	}
 	return sessions;
 }

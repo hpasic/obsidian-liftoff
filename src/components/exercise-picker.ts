@@ -15,16 +15,16 @@ const CATALOG_RENDER_CAP = 50;
 export type ExerciseSource = "catalog";
 
 /** Keyboard-reachable tap target that keeps its div styling: focusable, Enter/Space activate. */
-function makeActivatable(el: HTMLElement, activate: () => void): void {
+export function makeActivatable(el: HTMLElement, activate: (evt: Event) => void): void {
 	el.setAttr("role", "button");
 	el.setAttr("tabindex", "0");
-	el.addEventListener("click", activate);
+	el.addEventListener("click", (evt) => activate(evt));
 	el.addEventListener("keydown", (evt) => {
 		if (evt.key !== "Enter" && evt.key !== " ") return;
 		evt.preventDefault(); // Space would scroll the results
 		// Holding the key down must not toggle a chip over and over
 		if (evt.repeat) return;
-		activate();
+		activate(evt);
 	});
 }
 

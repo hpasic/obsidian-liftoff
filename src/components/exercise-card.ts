@@ -2,6 +2,7 @@ import { Menu } from "obsidian";
 import type { Exercise, WorkoutSet, LiftOffSettings } from "../types";
 import type { LastExerciseData } from "../utils/history";
 import { applyToBests, detectPRs, formatReps, type PRBests, type PRKind } from "../utils/sets";
+import { makeActivatable } from "./exercise-picker";
 import { DurationSetRow } from "./duration-set-row";
 import { SetRow } from "./set-row";
 import { TimerBlock } from "./timer-block";
@@ -78,7 +79,7 @@ export class ExerciseCard {
 		const { onShowHistory } = this.callbacks;
 		if (onShowHistory) {
 			nameEl.addClass("ln-exercise-name-link");
-			nameEl.addEventListener("click", (evt) => {
+			makeActivatable(nameEl, (evt) => {
 				// The rest of the header toggles collapse
 				evt.stopPropagation();
 				onShowHistory();
