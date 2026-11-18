@@ -48,6 +48,14 @@ Every saved workout gets a `## Summary` section with total duration, working-set
 
 ![Workout summary](screenshots/summary.png)
 
+### Dashboards
+
+The same stats are saved as frontmatter properties, so Obsidian Bases and Dataview can chart and tabulate them across workouts: `total_volume` (in your weight unit), `volume_unit`, `working_sets`, `pr_count`, `prs` (for example `Bench Press: Weight PR`), and `exercise_names`. Notes saved before these properties existed still load; their columns are just empty.
+
+Copy [`docs/bases/Workouts.base`](docs/bases/Workouts.base) into your vault for a ready-made table of all workouts, newest first, with date, template, duration, total volume, and PR count. Obsidian's Bases core plugin must be enabled.
+
+![Workouts Base table](screenshots/bases-dashboard.png)
+
 ### Timers and holds
 
 A built-in rest timer with preset durations, an interval timer for HIIT-style work/rest sets, and count-up duration holds for static exercises like planks, dead hangs, and L-sits.

@@ -5,8 +5,9 @@ src/**/*.js
 data.json
 .DS_Store
 
-# Internal docs and AI config
-docs/
+# Internal docs and AI config (docs/bases/ is shipped)
+docs/*
+!docs/bases/
 .claude/
 CLAUDE.md
 AGENTS.md

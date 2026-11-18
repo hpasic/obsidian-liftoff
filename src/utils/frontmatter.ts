@@ -1,5 +1,6 @@
 import type { Workout } from "../types";
 import { effectiveSetType, formatReps } from "./sets";
+import { prStrings, roundVolume, type WorkoutSummary } from "./summary";
 
 const SET_TYPE_BODY_LABEL: Record<string, string> = {
 	working: "",
@@ -17,7 +18,17 @@ function yamlQuote(value: string): string {
 	return `"${escaped}"`;
 }
 
-export function workoutToFrontmatter(workout: Workout): string {
+function pushStringList(lines: string[], key: string, values: string[]): void {
+	if (values.length === 0) {
+		lines.push(`${key}: []`);
+		return;
+	}
+	lines.push(`${key}:`);
+	for (const v of values) lines.push(`  - ${yamlQuote(v)}`);
+}
+
+/** `summary` adds the queryable stats; it is the same object that renders `## Summary`. */
+export function workoutToFrontmatter(workout: Workout, summary?: WorkoutSummary): string {
 	const lines: string[] = ["---"];
 
 	lines.push(`type: ${workout.type}`);
@@ -31,6 +42,15 @@ export function workoutToFrontmatter(workout: Workout): string {
 	}
 	if (workout.duration !== null) {
 		lines.push(`duration: ${workout.duration}`);
+	}
+	if (summary) {
+		lines.push(`total_volume: ${roundVolume(summary.totalVolume)}`);
+		lines.push(`volume_unit: ${summary.unit}`);
+		lines.push(`working_sets: ${summary.totalWorkingSets}`);
+		const prs = prStrings(summary);
+		lines.push(`pr_count: ${prs.length}`);
+		pushStringList(lines, "prs", prs);
+		pushStringList(lines, "exercise_names", workout.exercises.map((e) => e.name));
 	}
 
 	lines.push("exercises:");
@@ -158,7 +178,7 @@ export function workoutToMarkdownBody(workout: Workout): string {
 	return lines.join("\n").trimEnd();
 }
 
-export function workoutToFullMarkdown(workout: Workout, extraSections: string = ""): string {
+export function workoutToFullMarkdown(workout: Workout, extraSections: string = "", summary?: WorkoutSummary): string {
 	const tail = extraSections ? "\n\n" + extraSections : "";
-	return workoutToFrontmatter(workout) + "\n" + workoutToMarkdownBody(workout) + tail + "\n";
+	return workoutToFrontmatter(workout, summary) + "\n" + workoutToMarkdownBody(workout) + tail + "\n";
 }

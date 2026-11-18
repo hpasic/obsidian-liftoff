@@ -1,0 +1,29 @@
+filters:
+  and:
+    - 'type == "workout"'
+properties:
+  file.name:
+    displayName: Workout
+  note.date:
+    displayName: Date
+  note.template:
+    displayName: Template
+  note.duration:
+    displayName: Duration (min)
+  note.total_volume:
+    displayName: Total volume
+  note.pr_count:
+    displayName: PRs
+views:
+  - type: table
+    name: Workouts
+    order:
+      - file.name
+      - note.date
+      - note.template
+      - note.duration
+      - note.total_volume
+      - note.pr_count
+    sort:
+      - property: note.date
+        direction: DESC

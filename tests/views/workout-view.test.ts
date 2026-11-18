@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS, type ActiveWorkout, type Exercise, type Workout } fro
 import { DurationSetRow } from "../../src/components/duration-set-row";
 import { screenWakeLock } from "../../src/utils/wake-lock";
 import { workoutToFullMarkdown } from "../../src/utils/frontmatter";
+import type { WorkoutSummary } from "../../src/utils/summary";
 import { click, element, exercise, input, menuAction, trackIntervals } from "../helpers/dom";
 
 const views: WorkoutView[] = [];
@@ -456,6 +457,8 @@ describe("WorkoutView finish", () => {
 		await finish(root);
 		const summary = plugin.workoutStore.saveWorkout.mock.calls[0]![1] as string;
 		expect(summary).toContain("- **Total volume**: 551.2 lbs");
+		const [saved, , stats] = plugin.workoutStore.saveWorkout.mock.calls[0]! as [Workout, string, WorkoutSummary];
+		expect(workoutToFullMarkdown(saved, summary, stats)).toContain("total_volume: 551.2\nvolume_unit: lbs\n");
 	});
 
 	it.each([false, true])("does not save a timer finished during count-in without a note (paused: %s)", async (paused) => {
