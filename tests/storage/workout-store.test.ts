@@ -4,6 +4,7 @@ import { WorkoutStore } from "../../src/storage/workout-store";
 import { workoutToFrontmatter } from "../../src/utils/frontmatter";
 import { DEFAULT_SETTINGS, type Workout } from "../../src/types";
 import { findLastSetsForExercise } from "../../src/utils/history";
+import { buildWorkoutSummary, renderSummaryMarkdown, type WorkoutSummary } from "../../src/utils/summary";
 
 /** Just enough YAML for what workoutToFrontmatter writes: scalars, booleans, quoted strings, flow maps. */
 function scalar(raw: string): unknown {
@@ -17,7 +18,13 @@ function scalar(raw: string): unknown {
 function parseFrontmatter(yaml: string): Record<string, unknown> {
 	const fm: Record<string, unknown> = {};
 	const exercises: Record<string, unknown>[] = [];
+	let listKey = "";
 	for (const line of yaml.split("\n").filter((l) => l !== "---")) {
+		const listItem = /^ {2}- (".*")$/.exec(line);
+		if (listItem) {
+			(fm[listKey] as unknown[]).push(scalar(listItem[1]!));
+			continue;
+		}
 		const flow = /^ {6}- \{ (.*) \}$/.exec(line);
 		const item = /^ {2}- (\w+): (.*)$/.exec(line);
 		const prop = /^ {4}(\w+):(.*)$/.exec(line);
@@ -33,19 +40,20 @@ function parseFrontmatter(yaml: string): Record<string, unknown> {
 		} else if (prop) {
 			exercises.at(-1)![prop[1]!] = prop[2]!.trim() === "" ? [] : scalar(prop[2]!);
 		} else if (top) {
-			fm[top[1]!] = top[1] === "exercises" ? exercises : scalar(top[2]!);
+			listKey = top[1]!;
+			fm[listKey] = top[1] === "exercises" ? exercises : top[2]!.trim() === "" ? [] : scalar(top[2]!);
 		}
 	}
 	return fm;
 }
 
-function storeFor(workout: Workout) {
+function storeFor(workout: Workout, summary?: WorkoutSummary) {
 	const file = Object.assign(new TFile(), {
 		path: "Workouts/w.md", basename: "w",
 		stat: { mtime: new Date(`${workout.date}T${workout.start}`).getTime() },
 	});
 	const folder = Object.assign(new TFolder(), { path: "Workouts", children: [file] });
-	const frontmatter = parseFrontmatter(workoutToFrontmatter(workout));
+	const frontmatter = parseFrontmatter(workoutToFrontmatter(workout, summary));
 	const app = {
 		vault: { getAbstractFileByPath: (path: string) => (path === "Workouts" ? folder : file) },
 		metadataCache: { getFileCache: () => ({ frontmatter }) },
@@ -140,6 +148,77 @@ describe("WorkoutStore.parseWorkoutFile round-trip", () => {
 			{ name: "Tabata", exerciseType: "timer", note: "ran out of time", sets: [] },
 			{ name: "Burpees", exerciseType: "timer", note: undefined, sets: [], workSeconds: 40, restSeconds: 20, transitionSeconds: 0, intervals: 5 },
 		]);
+	});
+});
+
+describe("summary properties in frontmatter", () => {
+	const STAT_KEYS = ["total_volume", "volume_unit", "working_sets", "pr_count", "prs", "exercise_names"];
+	// 100 kg x 5 plus 225 lbs x 3 (~102.06 kg x 3), both new bests against empty history
+	const mixed: Workout = {
+		...base,
+		exercises: [
+			{ name: "Bench Press", sets: [
+				{ weight: 100, reps: 5, unit: "kg", completed: true },
+				{ weight: 225, reps: 3, unit: "lbs", completed: true },
+			] },
+			{ name: "Tabata", exerciseType: "timer", sets: [], workSeconds: 40, restSeconds: 20, intervals: 5 },
+		],
+	};
+
+	it("writes the six properties from the same summary that renders ## Summary", () => {
+		const summary = buildWorkoutSummary(mixed, [], "kg");
+		const fm = parseFrontmatter(workoutToFrontmatter(mixed, summary));
+		const volumeLine = /\*\*Total volume\*\*: ([\d,.]+) (\w+)/.exec(renderSummaryMarkdown(summary))!;
+		expect(fm.total_volume).toBe(Number(volumeLine[1]!.replace(/,/g, "")));
+		expect(fm.volume_unit).toBe(volumeLine[2]);
+		expect(fm).toMatchObject({
+			volume_unit: "kg",
+			working_sets: 2,
+			pr_count: 3,
+			prs: ["Bench Press: Weight PR", "Bench Press: 1RM PR", "Bench Press: Volume PR"],
+			exercise_names: ["Bench Press", "Tabata"],
+		});
+		expect(fm.total_volume).toBeCloseTo(500 + 225 * 0.45359237 * 3, 0);
+	});
+
+	it("writes volume in the settings unit", () => {
+		const fm = parseFrontmatter(workoutToFrontmatter(mixed, buildWorkoutSummary(mixed, [], "lbs")));
+		expect(fm.volume_unit).toBe("lbs");
+		expect(fm.total_volume).toBeCloseTo(100 / 0.45359237 * 5 + 225 * 3, 0);
+	});
+
+	it("keeps colons and quotes in exercise names and PR strings through the round trip", () => {
+		const tricky = `Farmer's "Heavy" Carry: Day 2`;
+		const w: Workout = { ...base, exercises: [{ name: tricky, sets: [{ weight: 40, reps: 8, unit: "kg", completed: true }] }] };
+		const fm = parseFrontmatter(workoutToFrontmatter(w, buildWorkoutSummary(w, [], "kg")));
+		expect(fm.exercise_names).toEqual([tricky]);
+		expect(fm.prs).toContain(`${tricky}: Weight PR`);
+	});
+
+	it("writes empty lists when there are no PRs and no exercises", () => {
+		const empty = parseFrontmatter(workoutToFrontmatter(base, buildWorkoutSummary(base, [], "kg")));
+		expect(empty).toMatchObject({ total_volume: 0, working_sets: 0, pr_count: 0, prs: [], exercise_names: [] });
+	});
+
+	it("rewrites the properties when the same workout is saved again with a new summary", () => {
+		const first = parseFrontmatter(workoutToFrontmatter(mixed, buildWorkoutSummary(mixed, [], "kg")));
+		const again = parseFrontmatter(workoutToFrontmatter(mixed, buildWorkoutSummary(mixed, [mixed], "kg")));
+		expect(first.pr_count).toBe(3);
+		expect(again.pr_count).toBe(0);
+		expect(again.prs).toEqual([]);
+	});
+
+	it("loads a workout the same with or without the properties", () => {
+		expect(roundTrip(mixed)).toEqual(storeFor(mixed, buildWorkoutSummary(mixed, [], "kg")).store.parseWorkoutFile("Workouts/w.md"));
+	});
+
+	it("leaves a note from an older version without the properties unchanged", () => {
+		const fm = parseFrontmatter(workoutToFrontmatter(mixed));
+		for (const key of STAT_KEYS) expect(fm).not.toHaveProperty(key);
+		expect(workoutToFrontmatter(mixed)).not.toMatch(/total_volume|pr_count|exercise_names/);
+		const { store, file } = storeFor(mixed);
+		expect(store.getRecentWorkouts()).toEqual([expect.objectContaining({ exerciseCount: 2, duration: 40 })]);
+		expect(store.parseWorkoutFile(file.path)?.exercises).toHaveLength(2);
 	});
 });
 

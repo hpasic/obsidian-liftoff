@@ -2,6 +2,7 @@ import { App, TFile, TFolder, normalizePath } from "obsidian";
 import type { Workout, Exercise, WorkoutSet, SetType, LiftOffSettings } from "../types";
 import { workoutToFullMarkdown } from "../utils/frontmatter";
 import { generateWorkoutFilename } from "../utils/filename";
+import type { WorkoutSummary } from "../utils/summary";
 
 const SET_TYPES: SetType[] = ["warmup", "working", "drop", "failure"];
 
@@ -30,7 +31,7 @@ export class WorkoutStore {
 		private getSettings: () => LiftOffSettings
 	) {}
 
-	async saveWorkout(workout: Workout, extraSections: string = ""): Promise<TFile> {
+	async saveWorkout(workout: Workout, extraSections: string = "", summary?: WorkoutSummary): Promise<TFile> {
 		const settings = this.getSettings();
 		const folderPath = normalizePath(settings.workoutFolder);
 
@@ -40,7 +41,7 @@ export class WorkoutStore {
 		const filename = generateWorkoutFilename(workout.date, workout.template, existingFiles);
 		const filePath = normalizePath(`${folderPath}/${filename}`);
 
-		const content = workoutToFullMarkdown(workout, extraSections);
+		const content = workoutToFullMarkdown(workout, extraSections, summary);
 		return await this.app.vault.create(filePath, content);
 	}
 

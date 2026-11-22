@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findLastSetsForExercise } from "../../src/utils/history";
+import { findLastSetsForExercise, findSessionsForExercise } from "../../src/utils/history";
 import type { Workout } from "../../src/types";
 
 const workouts: Workout[] = [
@@ -103,5 +103,33 @@ describe("findLastSetsForExercise", () => {
 	it("returns just the note when every session was note-only", () => {
 		const noteOnly: Workout = { ...workouts[0]!, exercises: [{ name: "Dips", note: "elbow", sets: [] }] };
 		expect(findLastSetsForExercise([noteOnly], "Dips")).toEqual({ date: "2026-03-19", sets: [], note: "elbow", noteDate: "2026-03-19" });
+	});
+});
+
+describe("findSessionsForExercise", () => {
+	it("returns every session with the exercise newest first, case-insensitively, up to the limit", () => {
+		const sessions = findSessionsForExercise(workouts, "bench press");
+		expect(sessions.map((s) => [s.date, s.exercise.sets[0]!.weight])).toEqual([["2026-03-19", 80], ["2026-03-15", 75]]);
+		expect(findSessionsForExercise(workouts, "Bench Press", 1).map((s) => s.date)).toEqual(["2026-03-19"]);
+		expect(findSessionsForExercise(workouts, "Incline DB Press").map((s) => s.date)).toEqual(["2026-03-19"]);
+		expect(findSessionsForExercise(workouts, "Squat")).toEqual([]);
+	});
+
+	it("keeps note-only sessions", () => {
+		const noteOnly: Workout = { ...workouts[0]!, date: "2026-03-26", exercises: [{ name: "Bench Press", note: "skipped", sets: [] }] };
+		expect(findSessionsForExercise([noteOnly, ...workouts], "Bench Press").map((s) => s.date))
+			.toEqual(["2026-03-26", "2026-03-19", "2026-03-15"]);
+	});
+
+	it("combines repeated entries of the exercise in one workout into one session, before the limit", () => {
+		const twice: Workout = { ...workouts[0]!, date: "2026-03-26", exercises: [
+			{ name: "Bench Press", note: "a", sets: [{ weight: 60, reps: 5, unit: "kg", completed: true }] },
+			{ name: "Squat", sets: [] },
+			{ name: "bench press", note: "b", sets: [{ weight: 70, reps: 3, unit: "kg", completed: true }] },
+		] };
+		const sessions = findSessionsForExercise([twice, ...workouts], "Bench Press", 2);
+		expect(sessions.map((s) => s.date)).toEqual(["2026-03-26", "2026-03-19"]);
+		expect(sessions[0]!.exercise.sets.map((x) => x.weight)).toEqual([60, 70]);
+		expect(sessions[0]!.exercise.note).toBe("a\nb");
 	});
 });
