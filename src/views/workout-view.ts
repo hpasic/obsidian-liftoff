@@ -671,7 +671,11 @@ export class WorkoutView extends ItemView {
 			await this.plugin.workoutStore.saveWorkout(finished, summaryMd, summary);
 			await this.plugin.clearActiveWorkout();
 			const prCount = summary.prs.length;
-			new Notice(prCount > 0 ? `Workout saved! 🏆 ${prCount} PR${prCount === 1 ? "" : "s"}` : "Workout saved!");
+			new Notice(
+				prCount > 0 && !this.plugin.settings.hidePR
+					? `Workout saved! 🏆 ${prCount} PR${prCount === 1 ? "" : "s"}`
+					: "Workout saved!"
+			);
 			void this.plugin.showHomeView();
 		} catch (e) {
 			new Notice(`Error saving workout: ${String(e)}`);

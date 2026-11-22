@@ -99,6 +99,17 @@ export class LiftOffSettingTab extends PluginSettingTab {
 					},
 				],
 			},
+			{
+				type: "group",
+				heading: "Miscellaneous",
+				items: [
+					{
+						name: "Hide personal record notifications",
+						desc: "If personal record popup notifications for exercises shall be hidden",
+						control: { type: "toggle", key: "hidePR" },
+					},
+				],
+			},
 		];
 	}
 
@@ -144,6 +155,7 @@ export class LiftOffSettingTab extends PluginSettingTab {
 			}
 			case "keepScreenAwake":
 			case "showWhatsNew":
+			case "hidePR":
 				if (typeof value !== "boolean") return;
 				settings[key] = value;
 				break;
@@ -193,8 +205,8 @@ export class LiftOffSettingTab extends PluginSettingTab {
 					.addOption("kg", "Kilograms (kg)")
 					.addOption("lbs", "Pounds (lbs)")
 					.setValue(this.plugin.settings.weightUnit)
-					.onChange(async (value: "kg" | "lbs") => {
-						this.plugin.settings.weightUnit = value;
+					.onChange(async (value) => {
+						this.plugin.settings.weightUnit = value as "kg" | "lbs";
 						await this.plugin.saveSettings();
 					})
 			);
@@ -300,5 +312,16 @@ export class LiftOffSettingTab extends PluginSettingTab {
 						}
 					})
 			);
+			
+		new Setting(containerEl)
+			.setName("Hide personal record notifications")
+			.setDesc("If personal record popup notifications for exercises shall be hidden")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.hidePR).onChange(async (value) => {
+					this.plugin.settings.hidePR = value;
+					await this.plugin.saveSettings();
+				})
+			);
+		
 	}
 }

@@ -38,6 +38,7 @@ export class ExerciseCard {
 	private historyBests: PRBests;
 	private bests: PRBests;
 	private prKindsByIndex: Map<number, PRKind[]> = new Map();
+	private hidePRNotifications: boolean;
 
 	constructor(
 		parentEl: HTMLElement,
@@ -52,6 +53,9 @@ export class ExerciseCard {
 		this.expanded = true;
 		this.containerEl = parentEl.createDiv({ cls: "ln-exercise-card" });
 		this.setsContainerEl = null!;
+		
+		this.hidePRNotifications = this.settings.hidePR;
+
 		this.render();
 	}
 
@@ -411,7 +415,8 @@ export class ExerciseCard {
 						this.notifyChanged();
 						if (updatedSet.completed) {
 							const prs = detectPRs(updatedSet, this.bests);
-							if (prs.length > 0) {
+
+							if (prs.length > 0 && !this.hidePRNotifications) {
 								this.prKindsByIndex.set(i, prs);
 								row.showPR(prs);
 								applyToBests(updatedSet, this.bests);
